@@ -1,30 +1,40 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
 import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
 
-const FILTERS = ['Todos', 'Ingresos', 'Gastos', 'Transferencias', 'Tarjeta de crédito', 'Por revisar']
-
 export default function Transactions() {
   const { transactions, loading, addTransaction, addTransactions } = useTransactions()
   const [showNew, setShowNew]       = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const { t } = useTranslation()
 
-  const ghost   = transactions.filter(t => t.status === 'ghost').length
-  const review  = transactions.filter(t => t.status === 'review').length
-  const matched = transactions.filter(t => t.status === 'match').length
+  const FILTERS = [
+    t('transactions.filters.all'),
+    t('transactions.filters.income'),
+    t('transactions.filters.expenses'),
+    t('transactions.filters.transfers'),
+    t('transactions.filters.creditCard'),
+    t('transactions.filters.review'),
+  ]
+
+  const ghost   = transactions.filter(tx => tx.status === 'ghost').length
+  const review  = transactions.filter(tx => tx.status === 'review').length
+  const matched = transactions.filter(tx => tx.status === 'match').length
   const total   = transactions.length
 
   return (
     <>
-      <Topbar greet="Transacciones" date={`Abril 2026 · ${total} movimientos · ${review} por revisar`}>
+      <Topbar greet={t('transactions.title')}
+        date={t('transactions.subtitle', { month: 'April 2026', total, review })}>
         <button className="btn ghost sm" onClick={() => setShowImport(true)}>
-          <Icon name="upload" size={12} /> Importar
+          <Icon name="upload" size={12} /> {t('transactions.importBtn')}
         </button>
         <button className="btn primary sm" onClick={() => setShowNew(true)}>
-          <Icon name="plus" size={12} /> Nuevo movimiento
+          <Icon name="plus" size={12} /> {t('transactions.newBtn')}
         </button>
       </Topbar>
 
@@ -33,53 +43,51 @@ export default function Transactions() {
           {FILTERS.map((f, i) => (
             <button key={f} className={`tab ${i === 0 ? 'active' : ''}`}>
               {f}
-              {f === 'Por revisar' && <span className="filter-dot" />}
+              {i === 5 && <span className="filter-dot" />}
             </button>
           ))}
         </div>
         <div className="filter-spacer" />
-        <button className="btn ghost sm"><Icon name="filter" size={12} /> Categoría</button>
-        <button className="btn ghost sm"><Icon name="account" size={12} /> Cuenta</button>
-        <button className="btn ghost sm"><Icon name="calendar" size={12} /> Abril 2026</button>
+        <button className="btn ghost sm"><Icon name="filter" size={12} /> {t('transactions.filterBtns.category')}</button>
+        <button className="btn ghost sm"><Icon name="account" size={12} /> {t('transactions.filterBtns.account')}</button>
+        <button className="btn ghost sm"><Icon name="calendar" size={12} /> April 2026</button>
       </div>
 
       <div className="coverage-strip">
-        <CoverageItem label="Conciliados"     bar={total ? matched/total*100 : 0} color="var(--pos)"      num={<><span className="num">{matched}</span> <span>/ {total}</span></>} />
-        <CoverageItem label="Por revisar"     bar={total ? review/total*100  : 0} color="var(--warn)"     num={<><span className="num warn-text">{review}</span> <span>pendientes</span></>} />
-        <CoverageItem label="Cargos fantasma" bar={total ? ghost/total*100   : 0} color="var(--accent-2)" num={<><span className="num" style={{ color:'var(--accent-2)' }}>{ghost}</span> <span>detectados</span></>} />
+        <CoverageItem label={t('transactions.coverage.reconciled')}
+          bar={total ? matched/total*100 : 0} color="var(--pos)"
+          num={<><span className="num">{matched}</span> <span>/ {total}</span></>} />
+        <CoverageItem label={t('transactions.coverage.review')}
+          bar={total ? review/total*100 : 0} color="var(--warn)"
+          num={<><span className="num warn-text">{review}</span> <span>{t('transactions.coverage.pending')}</span></>} />
+        <CoverageItem label={t('transactions.coverage.ghost')}
+          bar={total ? ghost/total*100 : 0} color="var(--accent-2)"
+          num={<><span className="num" style={{ color:'var(--accent-2)' }}>{ghost}</span> <span>{t('transactions.coverage.detected')}</span></>} />
       </div>
 
       <div className="card tx-card">
         <div className="tx-header">
-          <span className="tx-col-d">Fecha</span>
-          <span className="tx-col-name">Concepto</span>
-          <span className="tx-col-cat">Categoría</span>
-          <span className="tx-col-acct">Cuenta</span>
-          <span className="tx-col-tag">Estado</span>
-          <span className="tx-col-amt">Monto</span>
+          <span className="tx-col-d">{t('transactions.columns.date')}</span>
+          <span className="tx-col-name">{t('transactions.columns.description')}</span>
+          <span className="tx-col-cat">{t('transactions.columns.category')}</span>
+          <span className="tx-col-acct">{t('transactions.columns.account')}</span>
+          <span className="tx-col-tag">{t('transactions.columns.status')}</span>
+          <span className="tx-col-amt">{t('transactions.columns.amount')}</span>
           <span className="tx-col-act"></span>
         </div>
         {loading
-          ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div>
+          ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.loading')}</div>
           : transactions.length === 0
-            ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>
-                Sin movimientos. Importa un archivo o agrega uno manualmente.
-              </div>
-            : transactions.map(t => <TxRow key={t.id} t={t} />)
+            ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.empty')}</div>
+            : transactions.map(tx => <TxRow key={tx.id} t={tx} />)
         }
       </div>
 
       {showNew && (
-        <NewTransactionModal
-          onClose={() => setShowNew(false)}
-          onSave={addTransaction}
-        />
+        <NewTransactionModal onClose={() => setShowNew(false)} onSave={addTransaction} />
       )}
       {showImport && (
-        <ImportModal
-          onClose={() => setShowImport(false)}
-          onSave={addTransactions}
-        />
+        <ImportModal onClose={() => setShowImport(false)} onSave={addTransactions} />
       )}
     </>
   )
@@ -95,12 +103,13 @@ function CoverageItem({ label, bar, color, num }) {
   )
 }
 
-function TxRow({ t }) {
-  const isGhost  = t.status === 'ghost'
-  const isReview = t.status === 'review'
-  const d = new Date(t.occurred_at)
-  const dateStr = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
-  const timeStr = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
+function TxRow({ t: tx }) {
+  const { t } = useTranslation()
+  const isGhost  = tx.status === 'ghost'
+  const isReview = tx.status === 'review'
+  const d = new Date(tx.occurred_at)
+  const dateStr = d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
+  const timeStr = d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false })
 
   return (
     <div className={`tx-row ${isGhost ? 'ghost-row-tx' : ''} ${isReview ? 'review-row-tx' : ''}`}>
@@ -109,30 +118,30 @@ function TxRow({ t }) {
         <div className="tx-time">{timeStr}</div>
       </div>
       <div className="tx-col-name">
-        <div className="tx-merchant">{t.description}</div>
+        <div className="tx-merchant">{tx.description}</div>
       </div>
       <div className="tx-col-cat">
-        {t.category && (
+        {tx.category && (
           <span className="cat-pill">
-            <span className="cat-dot" style={{ background: t.category.color }} />
-            {t.category.name}
+            <span className="cat-dot" style={{ background: tx.category.color }} />
+            {tx.category.name}
           </span>
         )}
       </div>
-      <div className="tx-col-acct">{t.account?.name}</div>
+      <div className="tx-col-acct">{tx.account?.name}</div>
       <div className="tx-col-tag">
-        {t.tag && (
-          <span className={`chip tag-${t.tag.kind}`}>
-            {t.tag.kind === 'ghost'  && <Icon name="ghost"  size={10} />}
-            {t.tag.kind === 'warn'   && <Icon name="review" size={10} />}
-            {t.tag.kind === 'ok'     && <Icon name="check"  size={10} />}
-            {t.tag.kind === 'income' && <Icon name="income" size={10} />}
-            {t.tag.txt}
+        {tx.tag && (
+          <span className={`chip tag-${tx.tag.kind}`}>
+            {tx.tag.kind === 'ghost'  && <Icon name="ghost"  size={10} />}
+            {tx.tag.kind === 'warn'   && <Icon name="review" size={10} />}
+            {tx.tag.kind === 'ok'     && <Icon name="check"  size={10} />}
+            {tx.tag.kind === 'income' && <Icon name="income" size={10} />}
+            {t('transactions.tags.' + tx.tag.key)}
           </span>
         )}
       </div>
-      <div className="tx-col-amt num" style={{ color: t.amount > 0 ? 'var(--pos)' : 'var(--ink-0)' }}>
-        {t.amount > 0 ? '+' : '−'}${Math.abs(t.amount).toFixed(2)}
+      <div className="tx-col-amt num" style={{ color: tx.amount > 0 ? 'var(--pos)' : 'var(--ink-0)' }}>
+        {tx.amount > 0 ? '+' : '−'}${Math.abs(tx.amount).toFixed(2)}
       </div>
       <div className="tx-col-act">
         <button className="icon-btn sm-btn"><Icon name="more" size={14} /></button>

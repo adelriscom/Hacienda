@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
@@ -8,6 +9,7 @@ const today = () => new Date().toISOString().slice(0, 10)
 export default function NewTransactionModal({ onClose, onSave }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
+  const { t } = useTranslation()
 
   const [form, setForm] = useState({
     occurred_at: today(),
@@ -29,7 +31,7 @@ export default function NewTransactionModal({ onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.description || !form.amount || !form.account_id) {
-      setError('Descripción, monto y cuenta son obligatorios.')
+      setError(t('newTx.required'))
       return
     }
     setSaving(true)
@@ -62,57 +64,62 @@ export default function NewTransactionModal({ onClose, onSave }) {
   const cadAccounts = accounts.filter(a => a.currency === 'CAD')
   const copAccounts = accounts.filter(a => a.currency === 'COP')
 
+  const types = [
+    ['expense',  t('newTx.expense')],
+    ['income',   t('newTx.income')],
+    ['transfer', t('newTx.transfer')],
+  ]
+
   return (
-    <Modal title="Nuevo movimiento" onClose={onClose}>
+    <Modal title={t('newTx.title')} onClose={onClose}>
       <form onSubmit={handleSubmit}>
         <div className="modal-body">
           <div className="form-grid">
 
-            {/* Type selector */}
+            {/* Type */}
             <div className="form-field span-2">
-              <label>Tipo</label>
+              <label>{t('newTx.type')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                {[['expense','Gasto'],['income','Ingreso'],['transfer','Transferencia']].map(([v, l]) => (
+                {types.map(([v, l]) => (
                   <button key={v} type="button"
                     style={{
                       flex: 1, height: 34, borderRadius: 8, border: '1px solid',
                       borderColor: form.type === v ? 'var(--accent)' : 'var(--border)',
-                      background: form.type === v ? 'rgba(99,102,241,.12)' : 'var(--bg-2)',
-                      color: form.type === v ? 'var(--accent)' : 'var(--ink-2)',
+                      background:  form.type === v ? 'rgba(99,102,241,.12)' : 'var(--bg-2)',
+                      color:       form.type === v ? 'var(--accent)' : 'var(--ink-2)',
                       fontSize: 13, fontWeight: 500, cursor: 'pointer',
                     }}
-                    onClick={() => set('type', v)}
-                  >{l}</button>
+                    onClick={() => set('type', v)}>{l}</button>
                 ))}
               </div>
             </div>
 
             {/* Date */}
             <div className="form-field">
-              <label>Fecha</label>
+              <label>{t('newTx.date')}</label>
               <input type="date" value={form.occurred_at}
                 onChange={e => set('occurred_at', e.target.value)} required />
             </div>
 
             {/* Amount */}
             <div className="form-field">
-              <label>Monto</label>
+              <label>{t('newTx.amount')}</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={form.amount} onChange={e => set('amount', e.target.value)} required />
             </div>
 
             {/* Description */}
             <div className="form-field span-2">
-              <label>Descripción</label>
-              <input type="text" placeholder="Ej. Groceries Costco"
+              <label>{t('newTx.description')}</label>
+              <input type="text" placeholder={t('newTx.descriptionPlaceholder')}
                 value={form.description} onChange={e => set('description', e.target.value)} required />
             </div>
 
             {/* Account */}
             <div className="form-field">
-              <label>Cuenta</label>
+              <label>{t('newTx.account')}</label>
               <select value={form.account_id} onChange={e => set('account_id', e.target.value)} required>
-                <option value="">— Seleccionar —</option>
+                <option value="">{t('newTx.accountSelect')}</option>
                 {cadAccounts.length > 0 && (
                   <optgroup label="CAD">
                     {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -128,20 +135,20 @@ export default function NewTransactionModal({ onClose, onSave }) {
 
             {/* Category */}
             <div className="form-field">
-              <label>Categoría</label>
+              <label>{t('newTx.category')}</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)}>
-                <option value="">— Sin categoría —</option>
+                <option value="">{t('newTx.categorySelect')}</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
 
             {/* Person */}
             <div className="form-field">
-              <label>Persona</label>
+              <label>{t('newTx.person')}</label>
               <select value={form.person} onChange={e => set('person', e.target.value)}>
                 <option value="Alexander">Alexander</option>
                 <option value="Marcela">Marcela</option>
-                <option value="Shared">Compartido</option>
+                <option value="Shared">{t('newTx.shared')}</option>
               </select>
             </div>
 
@@ -151,26 +158,25 @@ export default function NewTransactionModal({ onClose, onSave }) {
                 <input type="checkbox" checked={form.is_recurring}
                   onChange={e => set('is_recurring', e.target.checked)}
                   style={{ width: 'auto', height: 'auto' }} />
-                Recurrente
+                {t('newTx.recurring')}
               </label>
             </div>
 
             {/* Notes */}
             <div className="form-field span-2">
-              <label>Notas (opcional)</label>
-              <textarea placeholder="Detalles adicionales…"
+              <label>{t('newTx.notes')}</label>
+              <textarea placeholder={t('newTx.notesPlaceholder')}
                 value={form.notes} onChange={e => set('notes', e.target.value)} />
             </div>
 
           </div>
-
           {error && <p style={{ color: 'var(--neg)', fontSize: 12, marginTop: 12 }}>{error}</p>}
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn ghost" onClick={onClose}>{t('newTx.cancel')}</button>
           <button type="submit" className="btn primary" disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar movimiento'}
+            {saving ? t('newTx.saving') : t('newTx.save')}
           </button>
         </div>
       </form>

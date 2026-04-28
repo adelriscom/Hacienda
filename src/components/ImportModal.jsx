@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
+import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import Icon from './Icon'
 import { useAccounts } from '../hooks/useAccounts'
@@ -160,6 +161,7 @@ function parseSheet(ws, categories, accounts) {
 export default function ImportModal({ onClose, onSave }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
+  const { t } = useTranslation()
 
   const [step, setStep]             = useState('upload')
   const [wb, setWb]                 = useState(null)
@@ -195,7 +197,7 @@ export default function ImportModal({ onClose, onSave }) {
           setStep('sheet')
         }
       } catch (err) {
-        setError('No se pudo leer el archivo: ' + err.message)
+        setError(t('import.parseError', { msg: err.message }))
       }
     }
     reader.readAsArrayBuffer(f)
@@ -223,7 +225,7 @@ export default function ImportModal({ onClose, onSave }) {
   async function handleImport() {
     if (!rows?.length) return
     if (!defaultAcct) {
-      setError('Selecciona una cuenta predeterminada antes de importar.')
+      setError(t('import.selectAccountFirst'))
       return
     }
     setSaving(true); setError(null)
@@ -249,7 +251,7 @@ export default function ImportModal({ onClose, onSave }) {
   }
 
   return (
-    <Modal title="Importar movimientos" onClose={onClose} wide>
+    <Modal title={t('import.title')} onClose={onClose} wide>
       <div className="modal-body">
 
         {/* ── Step 1: Drop zone ── */}
@@ -262,8 +264,8 @@ export default function ImportModal({ onClose, onSave }) {
             onClick={() => fileRef.current.click()}
           >
             <div className="drop-zone-icon"><Icon name="upload" size={20} /></div>
-            <h3>Arrastra tu archivo aquí</h3>
-            <p>Formatos soportados: .xlsx, .xls, .csv</p>
+            <h3>{t('import.dropTitle')}</h3>
+            <p>{t('import.dropSub')}</p>
             <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
               style={{ display: 'none' }}
               onChange={e => e.target.files[0] && loadFile(e.target.files[0])} />
@@ -273,9 +275,8 @@ export default function ImportModal({ onClose, onSave }) {
         {/* ── Step 2: Sheet selector ── */}
         {step === 'sheet' && (
           <div>
-            <p style={{ fontSize: 13, color: 'var(--ink-1)', marginBottom: 16 }}>
-              Tu archivo tiene <strong>{sheetNames.length} pestañas</strong>. ¿Cuál contiene los movimientos?
-            </p>
+            <p style={{ fontSize: 13, color: 'var(--ink-1)', marginBottom: 16 }}
+              dangerouslySetInnerHTML={{ __html: t('import.multiSheet', { count: sheetNames.length }) }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sheetNames.map(name => (
                 <label key={name} style={{
@@ -299,59 +300,53 @@ export default function ImportModal({ onClose, onSave }) {
         {/* ── Step 3: Preview ── */}
         {step === 'preview' && stats && (
           <>
-            {/* Format info */}
             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
-              Pestaña: <strong style={{ color: 'var(--ink-1)' }}>{selectedSheet}</strong>
-              {' · '}Formato: <strong style={{ color: 'var(--ink-1)' }}>{stats.isSheet1 ? 'Sin encabezados' : 'Con encabezados'}</strong>
+              {t('import.sheetInfo')}<strong style={{ color: 'var(--ink-1)' }}>{selectedSheet}</strong>
+              {' · '}{t('import.formatInfo')}
+              <strong style={{ color: 'var(--ink-1)' }}>
+                {stats.isSheet1 ? t('import.formatNoHeaders') : t('import.formatWithHeaders')}
+              </strong>
             </div>
 
-            {/* Detected headers (only for standard format) */}
             {!stats.isSheet1 && stats.detectedHeaders?.length > 0 && (
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 12,
                 background: 'var(--bg-2)', borderRadius: 8, padding: '8px 12px' }}>
-                Columnas detectadas: {stats.detectedHeaders.map((h, i) => (
+                {t('import.detectedCols')} {stats.detectedHeaders.map((h, i) => (
                   <span key={i} style={{
-                    display: 'inline-block', margin: '2px 3px',
-                    padding: '1px 6px', borderRadius: 4,
-                    background: Object.values(ALIASES).flat().includes(norm(h))
-                      ? 'rgba(99,102,241,.18)' : 'var(--bg-1)',
-                    color: Object.values(ALIASES).flat().includes(norm(h))
-                      ? 'var(--accent)' : 'var(--ink-3)',
+                    display: 'inline-block', margin: '2px 3px', padding: '1px 6px', borderRadius: 4,
+                    background: Object.values(ALIASES).flat().includes(norm(h)) ? 'rgba(99,102,241,.18)' : 'var(--bg-1)',
+                    color: Object.values(ALIASES).flat().includes(norm(h)) ? 'var(--accent)' : 'var(--ink-3)',
                     border: '1px solid var(--border)',
                   }}>{h}</span>
                 ))}
-                <span style={{ display: 'block', marginTop: 4, color: 'var(--ink-3)' }}>
-                  Columnas en <span style={{ color: 'var(--accent)' }}>morado</span> fueron reconocidas.
-                </span>
+                <span style={{ display: 'block', marginTop: 4 }}>{t('import.recognizedNote')}</span>
               </div>
             )}
 
-            {/* Stats */}
             <div className="import-stats">
               <div className="import-stat">
                 <div className="import-stat-num">{stats.total}</div>
-                <div className="import-stat-label">Movimientos</div>
+                <div className="import-stat-label">{t('import.statsTotal')}</div>
               </div>
               <div className="import-stat">
                 <div className="import-stat-num" style={{ color: stats.catUnmatched ? 'var(--warn)' : 'var(--pos)' }}>
                   {stats.catMatched}
                 </div>
-                <div className="import-stat-label">Categorías OK</div>
+                <div className="import-stat-label">{t('import.statsCatOk')}</div>
               </div>
               {stats.catUnmatched > 0 && (
                 <div className="import-stat">
                   <div className="import-stat-num" style={{ color: 'var(--warn)' }}>{stats.catUnmatched}</div>
-                  <div className="import-stat-label">Sin categoría</div>
+                  <div className="import-stat-label">{t('import.statsCatNo')}</div>
                 </div>
               )}
             </div>
 
-            {/* Default account + person (always required) */}
             <div className="form-grid" style={{ marginBottom: 14 }}>
               <div className="form-field">
-                <label>Cuenta predeterminada {!stats.isSheet1 && '(para filas sin cuenta)'}</label>
+                <label>{t('import.defaultAccount')} {!stats.isSheet1 && t('import.defaultAccountNote')}</label>
                 <select value={defaultAcct} onChange={e => setDefaultAcct(e.target.value)}>
-                  <option value="">— Seleccionar cuenta —</option>
+                  <option value="">{t('import.accountSelect')}</option>
                   {cadAccounts.length > 0 && (
                     <optgroup label="CAD">
                       {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -365,37 +360,35 @@ export default function ImportModal({ onClose, onSave }) {
                 </select>
               </div>
               <div className="form-field">
-                <label>Persona predeterminada {!stats.isSheet1 && '(para filas sin persona)'}</label>
+                <label>{t('import.defaultPerson')} {!stats.isSheet1 && t('import.defaultPersonNote')}</label>
                 <select value={defaultPerson} onChange={e => setDefaultPerson(e.target.value)}>
                   <option value="Alexander">Alexander</option>
                   <option value="Marcela">Marcela</option>
-                  <option value="Shared">Compartido</option>
+                  <option value="Shared">{t('person.shared')}</option>
                 </select>
               </div>
             </div>
 
             {stats.total === 0 ? (
-              <p style={{ color: 'var(--warn)', fontSize: 13, padding: '16px 0' }}>
-                No se encontraron filas con datos en esta pestaña.
-              </p>
+              <p style={{ color: 'var(--warn)', fontSize: 13, padding: '16px 0' }}>{t('import.noData')}</p>
             ) : (
               <>
                 <div className="preview-table-wrap">
                   <table className="preview-table">
                     <thead>
                       <tr>
-                        <th>Fecha</th>
-                        <th>Descripción</th>
-                        <th>Categoría</th>
-                        {!stats.isSheet1 && <th>Cuenta</th>}
-                        {!stats.isSheet1 && <th>Quien</th>}
-                        <th className="num">Monto</th>
+                        <th>{t('import.colDate')}</th>
+                        <th>{t('import.colDesc')}</th>
+                        <th>{t('import.colCat')}</th>
+                        {!stats.isSheet1 && <th>{t('import.colAcct')}</th>}
+                        {!stats.isSheet1 && <th>{t('import.colPerson')}</th>}
+                        <th className="num">{t('import.colAmt')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {preview.map((r, i) => (
                         <tr key={i} className={r._cat_warn ? 'warn-row' : ''}>
-                          <td>{new Date(r.occurred_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
+                          <td>{new Date(r.occurred_at).toLocaleDateString('en-CA', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
                           <td>{r.description || '—'}</td>
                           <td style={{ color: r._cat_warn ? 'var(--warn)' : undefined }}>{r.category_name || '—'}</td>
                           {!stats.isSheet1 && <td>{r.account_name || '—'}</td>}
@@ -410,7 +403,7 @@ export default function ImportModal({ onClose, onSave }) {
                 </div>
                 {rows.length > 15 && (
                   <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6, textAlign: 'right' }}>
-                    Mostrando 15 de {rows.length} filas
+                    {t('import.showingRows', { total: rows.length })}
                   </p>
                 )}
               </>
@@ -424,24 +417,24 @@ export default function ImportModal({ onClose, onSave }) {
       <div className="modal-footer">
         {step !== 'upload' && (
           <button type="button" className="btn ghost" onClick={reset} style={{ marginRight: 'auto' }}>
-            ← Cambiar archivo
+            {t('import.changeFile')}
           </button>
         )}
-        <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button>
+        <button type="button" className="btn ghost" onClick={onClose}>{t('import.cancel')}</button>
 
         {step === 'sheet' && (
           <button type="button" className="btn primary" onClick={handleSheetConfirm} disabled={!selectedSheet}>
-            Continuar →
+            {t('import.continue')}
           </button>
         )}
         {step === 'preview' && stats?.total > 0 && (
           <button type="button" className="btn primary" onClick={handleImport} disabled={saving}>
-            {saving ? 'Importando…' : `Importar ${rows.length} movimientos`}
+            {saving ? t('import.importing') : t('import.importBtn', { count: rows.length })}
           </button>
         )}
         {step === 'preview' && stats?.total === 0 && sheetNames.length > 1 && (
           <button type="button" className="btn ghost" onClick={() => setStep('sheet')}>
-            ← Elegir otra pestaña
+            {t('import.chooseOtherTab')}
           </button>
         )}
       </div>

@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import Icon from '../components/Icon'
 
+const LANGS = [{ code: 'en', label: 'EN' }, { code: 'es', label: 'ES' }, { code: 'fr', label: 'FR' }]
+
 export default function Login() {
-  const [mode, setMode] = useState('login') // 'login' | 'signup'
+  const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -27,50 +31,55 @@ export default function Login() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
+        {/* Language picker */}
+        <div style={{ display: 'flex', gap: 4, alignSelf: 'flex-end', marginBottom: 4 }}>
+          {LANGS.map(({ code, label }) => (
+            <button key={code} onClick={() => i18n.changeLanguage(code)}
+              style={{
+                height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid',
+                borderColor: i18n.language === code ? 'var(--accent)' : 'var(--border)',
+                background: i18n.language === code ? 'rgba(99,102,241,.15)' : 'transparent',
+                color: i18n.language === code ? 'var(--accent)' : 'var(--ink-3)',
+                fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div style={styles.logo}>H</div>
         <h1 style={styles.title}>Hacienda</h1>
-        <p style={styles.sub}>Control familiar de finanzas</p>
+        <p style={styles.sub}>{t('login.tagline')}</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>
             <Icon name="mail" size={14} style={{ color: 'var(--ink-3)' }} />
-            Correo electrónico
+            {t('login.email')}
           </label>
-          <input
-            style={styles.input}
-            type="email"
-            value={email}
+          <input style={styles.input} type="email" value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="tu@correo.com"
-            required
-            autoFocus
-          />
+            placeholder={t('login.emailPlaceholder')} required autoFocus />
 
           <label style={styles.label}>
             <Icon name="lock" size={14} style={{ color: 'var(--ink-3)' }} />
-            Contraseña
+            {t('login.password')}
           </label>
-          <input
-            style={styles.input}
-            type="password"
-            value={password}
+          <input style={styles.input} type="password" value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            minLength={6}
-          />
+            placeholder="••••••••" required minLength={6} />
 
           {error && <p style={styles.error}>{error}</p>}
 
           <button style={styles.btn} type="submit" disabled={loading}>
-            {loading ? 'Procesando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+            {loading ? t('login.loading') : mode === 'login' ? t('login.signIn') : t('login.createAccount')}
           </button>
         </form>
 
         <p style={styles.toggle}>
-          {mode === 'login' ? '¿Sin cuenta?' : '¿Ya tienes cuenta?'}{' '}
-          <button style={styles.link} onClick={() => { setMode(m => m === 'login' ? 'signup' : 'login'); setError(null) }}>
-            {mode === 'login' ? 'Regístrate' : 'Inicia sesión'}
+          {mode === 'login' ? t('login.noAccount') : t('login.hasAccount')}{' '}
+          <button style={styles.link}
+            onClick={() => { setMode(m => m === 'login' ? 'signup' : 'login'); setError(null) }}>
+            {mode === 'login' ? t('login.register') : t('login.loginLink')}
           </button>
         </p>
       </div>

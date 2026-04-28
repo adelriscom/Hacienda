@@ -1,0 +1,77 @@
+{
+  "brand": { "tagline": "Family finance control", "plan": "Premium Plan", "sub": "Family Control" },
+  "nav": {
+    "principal": "Main", "tools": "Tools",
+    "dashboard": "Dashboard", "expenses": "Expenses", "income": "Income",
+    "budgets": "Budgets", "calendar": "Calendar", "review": "Review",
+    "reports": "Reports", "recurring": "Recurring", "accounts": "Accounts"
+  },
+  "login": {
+    "tagline": "Family finance control",
+    "email": "Email address", "emailPlaceholder": "you@email.com",
+    "password": "Password",
+    "loading": "Processing…", "signIn": "Sign in", "createAccount": "Create account",
+    "noAccount": "No account?", "hasAccount": "Already have an account?",
+    "register": "Register", "loginLink": "Sign in"
+  },
+  "topbar": { "search": "Search transaction, category…" },
+  "transactions": {
+    "title": "Transactions",
+    "subtitle": "{{month}} · {{total}} transactions · {{review}} to review",
+    "newBtn": "New transaction", "importBtn": "Import",
+    "loading": "Loading…",
+    "empty": "No transactions. Import a file or add one manually.",
+    "filters": {
+      "all": "All", "income": "Income", "expenses": "Expenses",
+      "transfers": "Transfers", "creditCard": "Credit card", "review": "To review"
+    },
+    "filterBtns": { "category": "Category", "account": "Account" },
+    "coverage": {
+      "reconciled": "Reconciled", "review": "To review", "ghost": "Ghost charges",
+      "pending": "pending", "detected": "detected"
+    },
+    "columns": {
+      "date": "Date", "description": "Description", "category": "Category",
+      "account": "Account", "status": "Status", "amount": "Amount"
+    },
+    "tags": {
+      "ghost": "Ghost charge", "review": "To review", "duplicate": "Duplicate",
+      "income": "Income", "transfer": "Transfer", "recurring": "Recurring"
+    }
+  },
+  "newTx": {
+    "title": "New transaction",
+    "type": "Type", "expense": "Expense", "income": "Income", "transfer": "Transfer",
+    "date": "Date", "amount": "Amount", "description": "Description",
+    "descriptionPlaceholder": "e.g. Groceries Costco",
+    "account": "Account", "accountSelect": "— Select —",
+    "category": "Category", "categorySelect": "— No category —",
+    "person": "Person", "shared": "Shared",
+    "recurring": "Recurring", "notes": "Notes (optional)", "notesPlaceholder": "Additional details…",
+    "cancel": "Cancel", "saving": "Saving…", "save": "Save transaction",
+    "required": "Description, amount and account are required."
+  },
+  "import": {
+    "title": "Import transactions",
+    "dropTitle": "Drop your file here", "dropSub": "Supported formats: .xlsx, .xls, .csv",
+    "multiSheet": "Your file has {{count}} tabs. Which one contains the transactions?",
+    "continue": "Continue →", "changeFile": "← Change file", "cancel": "Cancel",
+    "chooseOtherTab": "← Choose another tab",
+    "sheetInfo": "Tab: ", "formatInfo": "Format: ",
+    "formatNoHeaders": "No headers", "formatWithHeaders": "With headers",
+    "detectedCols": "Detected columns:", "recognizedNote": "Columns in purple were recognized.",
+    "statsTotal": "Transactions", "statsCatOk": "Categories OK", "statsCatNo": "No category",
+    "defaultAccount": "Default account", "defaultAccountNote": "(for rows without account)",
+    "defaultPerson": "Default person", "defaultPersonNote": "(for rows without person)",
+    "accountSelect": "— Select account —",
+    "noData": "No data rows found in this tab.",
+    "showingRows": "Showing 15 of {{total}} rows",
+    "importBtn": "Import {{count}} transactions", "importing": "Importing…",
+    "selectAccountFirst": "Please select an account before importing.",
+    "parseError": "Could not read file: {{msg}}",
+    "colDate": "Date", "colDesc": "Description", "colCat": "Category",
+    "colAcct": "Account", "colPerson": "Person", "colAmt": "Amount"
+  },
+  "person": { "shared": "Shared" },
+  "lang": { "label": "Language" }
+}

@@ -1,0 +1,77 @@
+{
+  "brand": { "tagline": "Control familiar de finanzas", "plan": "Plan Premium", "sub": "Control Familiar" },
+  "nav": {
+    "principal": "Principal", "tools": "Herramientas",
+    "dashboard": "Dashboard", "expenses": "Gastos", "income": "Ingresos",
+    "budgets": "Presupuestos", "calendar": "Calendario", "review": "Por revisar",
+    "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas"
+  },
+  "login": {
+    "tagline": "Control familiar de finanzas",
+    "email": "Correo electrónico", "emailPlaceholder": "tu@correo.com",
+    "password": "Contraseña",
+    "loading": "Procesando…", "signIn": "Iniciar sesión", "createAccount": "Crear cuenta",
+    "noAccount": "¿Sin cuenta?", "hasAccount": "¿Ya tienes cuenta?",
+    "register": "Regístrate", "loginLink": "Inicia sesión"
+  },
+  "topbar": { "search": "Buscar transacción, categoría…" },
+  "transactions": {
+    "title": "Transacciones",
+    "subtitle": "{{month}} · {{total}} movimientos · {{review}} por revisar",
+    "newBtn": "Nuevo movimiento", "importBtn": "Importar",
+    "loading": "Cargando…",
+    "empty": "Sin movimientos. Importa un archivo o agrega uno manualmente.",
+    "filters": {
+      "all": "Todos", "income": "Ingresos", "expenses": "Gastos",
+      "transfers": "Transferencias", "creditCard": "Tarjeta de crédito", "review": "Por revisar"
+    },
+    "filterBtns": { "category": "Categoría", "account": "Cuenta" },
+    "coverage": {
+      "reconciled": "Conciliados", "review": "Por revisar", "ghost": "Cargos fantasma",
+      "pending": "pendientes", "detected": "detectados"
+    },
+    "columns": {
+      "date": "Fecha", "description": "Concepto", "category": "Categoría",
+      "account": "Cuenta", "status": "Estado", "amount": "Monto"
+    },
+    "tags": {
+      "ghost": "Cargo fantasma", "review": "Por revisar", "duplicate": "Duplicado",
+      "income": "Ingreso", "transfer": "Transferencia", "recurring": "Recurrente"
+    }
+  },
+  "newTx": {
+    "title": "Nuevo movimiento",
+    "type": "Tipo", "expense": "Gasto", "income": "Ingreso", "transfer": "Transferencia",
+    "date": "Fecha", "amount": "Monto", "description": "Descripción",
+    "descriptionPlaceholder": "Ej. Groceries Costco",
+    "account": "Cuenta", "accountSelect": "— Seleccionar —",
+    "category": "Categoría", "categorySelect": "— Sin categoría —",
+    "person": "Persona", "shared": "Compartido",
+    "recurring": "Recurrente", "notes": "Notas (opcional)", "notesPlaceholder": "Detalles adicionales…",
+    "cancel": "Cancelar", "saving": "Guardando…", "save": "Guardar movimiento",
+    "required": "Descripción, monto y cuenta son obligatorios."
+  },
+  "import": {
+    "title": "Importar movimientos",
+    "dropTitle": "Arrastra tu archivo aquí", "dropSub": "Formatos soportados: .xlsx, .xls, .csv",
+    "multiSheet": "Tu archivo tiene {{count}} pestañas. ¿Cuál contiene los movimientos?",
+    "continue": "Continuar →", "changeFile": "← Cambiar archivo", "cancel": "Cancelar",
+    "chooseOtherTab": "← Elegir otra pestaña",
+    "sheetInfo": "Pestaña: ", "formatInfo": "Formato: ",
+    "formatNoHeaders": "Sin encabezados", "formatWithHeaders": "Con encabezados",
+    "detectedCols": "Columnas detectadas:", "recognizedNote": "Columnas en morado fueron reconocidas.",
+    "statsTotal": "Movimientos", "statsCatOk": "Categorías OK", "statsCatNo": "Sin categoría",
+    "defaultAccount": "Cuenta predeterminada", "defaultAccountNote": "(para filas sin cuenta)",
+    "defaultPerson": "Persona predeterminada", "defaultPersonNote": "(para filas sin persona)",
+    "accountSelect": "— Seleccionar cuenta —",
+    "noData": "No se encontraron filas con datos en esta pestaña.",
+    "showingRows": "Mostrando 15 de {{total}} filas",
+    "importBtn": "Importar {{count}} movimientos", "importing": "Importando…",
+    "selectAccountFirst": "Selecciona una cuenta antes de importar.",
+    "parseError": "No se pudo leer el archivo: {{msg}}",
+    "colDate": "Fecha", "colDesc": "Descripción", "colCat": "Categoría",
+    "colAcct": "Cuenta", "colPerson": "Quien", "colAmt": "Monto"
+  },
+  "person": { "shared": "Compartido" },
+  "lang": { "label": "Idioma" }
+}

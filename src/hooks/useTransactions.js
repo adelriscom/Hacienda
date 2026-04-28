@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 function computeTag(t) {
-  if (t.status === 'ghost')    return { kind: 'ghost',  txt: 'Cargo fantasma' }
-  if (t.status === 'review')   return { kind: 'warn',   txt: 'Por revisar' }
-  if (t.status === 'duplicate')return { kind: 'warn',   txt: 'Duplicado' }
-  if (t.type   === 'income')   return { kind: 'income', txt: 'Ingreso' }
-  if (t.type   === 'transfer') return { kind: 'ok',     txt: 'Transferencia' }
-  if (t.is_recurring)          return { kind: 'ok',     txt: 'Recurrente' }
+  if (t.status === 'ghost')    return { kind: 'ghost',  key: 'ghost' }
+  if (t.status === 'review')   return { kind: 'warn',   key: 'review' }
+  if (t.status === 'duplicate')return { kind: 'warn',   key: 'duplicate' }
+  if (t.type   === 'income')   return { kind: 'income', key: 'income' }
+  if (t.type   === 'transfer') return { kind: 'ok',     key: 'transfer' }
+  if (t.is_recurring)          return { kind: 'ok',     key: 'recurring' }
   return null
 }
 

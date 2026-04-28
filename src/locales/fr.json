@@ -1,0 +1,77 @@
+{
+  "brand": { "tagline": "Gestion financière familiale", "plan": "Plan Premium", "sub": "Contrôle Familial" },
+  "nav": {
+    "principal": "Principal", "tools": "Outils",
+    "dashboard": "Tableau de bord", "expenses": "Dépenses", "income": "Revenus",
+    "budgets": "Budgets", "calendar": "Calendrier", "review": "À réviser",
+    "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes"
+  },
+  "login": {
+    "tagline": "Gestion financière familiale",
+    "email": "Adresse e-mail", "emailPlaceholder": "vous@email.com",
+    "password": "Mot de passe",
+    "loading": "En cours…", "signIn": "Se connecter", "createAccount": "Créer un compte",
+    "noAccount": "Pas de compte ?", "hasAccount": "Déjà un compte ?",
+    "register": "S'inscrire", "loginLink": "Se connecter"
+  },
+  "topbar": { "search": "Rechercher une transaction, catégorie…" },
+  "transactions": {
+    "title": "Transactions",
+    "subtitle": "{{month}} · {{total}} transactions · {{review}} à réviser",
+    "newBtn": "Nouvelle transaction", "importBtn": "Importer",
+    "loading": "Chargement…",
+    "empty": "Aucune transaction. Importez un fichier ou ajoutez-en une manuellement.",
+    "filters": {
+      "all": "Tout", "income": "Revenus", "expenses": "Dépenses",
+      "transfers": "Virements", "creditCard": "Carte de crédit", "review": "À réviser"
+    },
+    "filterBtns": { "category": "Catégorie", "account": "Compte" },
+    "coverage": {
+      "reconciled": "Réconciliés", "review": "À réviser", "ghost": "Charges fantômes",
+      "pending": "en attente", "detected": "détectées"
+    },
+    "columns": {
+      "date": "Date", "description": "Description", "category": "Catégorie",
+      "account": "Compte", "status": "Statut", "amount": "Montant"
+    },
+    "tags": {
+      "ghost": "Charge fantôme", "review": "À réviser", "duplicate": "Doublon",
+      "income": "Revenu", "transfer": "Virement", "recurring": "Récurrent"
+    }
+  },
+  "newTx": {
+    "title": "Nouvelle transaction",
+    "type": "Type", "expense": "Dépense", "income": "Revenu", "transfer": "Virement",
+    "date": "Date", "amount": "Montant", "description": "Description",
+    "descriptionPlaceholder": "ex. Épicerie Costco",
+    "account": "Compte", "accountSelect": "— Sélectionner —",
+    "category": "Catégorie", "categorySelect": "— Sans catégorie —",
+    "person": "Personne", "shared": "Partagé",
+    "recurring": "Récurrent", "notes": "Notes (optionnel)", "notesPlaceholder": "Détails supplémentaires…",
+    "cancel": "Annuler", "saving": "Enregistrement…", "save": "Enregistrer",
+    "required": "Description, montant et compte sont obligatoires."
+  },
+  "import": {
+    "title": "Importer des transactions",
+    "dropTitle": "Déposez votre fichier ici", "dropSub": "Formats supportés : .xlsx, .xls, .csv",
+    "multiSheet": "Votre fichier a {{count}} onglets. Lequel contient les transactions ?",
+    "continue": "Continuer →", "changeFile": "← Changer le fichier", "cancel": "Annuler",
+    "chooseOtherTab": "← Choisir un autre onglet",
+    "sheetInfo": "Onglet : ", "formatInfo": "Format : ",
+    "formatNoHeaders": "Sans en-têtes", "formatWithHeaders": "Avec en-têtes",
+    "detectedCols": "Colonnes détectées :", "recognizedNote": "Les colonnes en violet ont été reconnues.",
+    "statsTotal": "Transactions", "statsCatOk": "Catégories OK", "statsCatNo": "Sans catégorie",
+    "defaultAccount": "Compte par défaut", "defaultAccountNote": "(pour les lignes sans compte)",
+    "defaultPerson": "Personne par défaut", "defaultPersonNote": "(pour les lignes sans personne)",
+    "accountSelect": "— Sélectionner un compte —",
+    "noData": "Aucune ligne de données trouvée dans cet onglet.",
+    "showingRows": "Affichage de 15 sur {{total}} lignes",
+    "importBtn": "Importer {{count}} transactions", "importing": "Importation…",
+    "selectAccountFirst": "Sélectionnez un compte avant d'importer.",
+    "parseError": "Impossible de lire le fichier : {{msg}}",
+    "colDate": "Date", "colDesc": "Description", "colCat": "Catégorie",
+    "colAcct": "Compte", "colPerson": "Personne", "colAmt": "Montant"
+  },
+  "person": { "shared": "Partagé" },
+  "lang": { "label": "Langue" }
+}
