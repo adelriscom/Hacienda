@@ -35,13 +35,18 @@ export function useTransactions() {
   useEffect(() => { load() }, [load])
 
   async function addTransaction(values) {
-    const { error } = await supabase.from('transactions').insert([values])
+    const { data: { session } } = await supabase.auth.getSession()
+    const user_id = session?.user?.id
+    const { error } = await supabase.from('transactions').insert([{ ...values, user_id }])
     if (error) throw error
     await load()
   }
 
   async function addTransactions(rows) {
-    const { error } = await supabase.from('transactions').insert(rows)
+    const { data: { session } } = await supabase.auth.getSession()
+    const user_id = session?.user?.id
+    const withUserId = rows.map(r => ({ ...r, user_id }))
+    const { error } = await supabase.from('transactions').insert(withUserId)
     if (error) throw error
     await load()
   }

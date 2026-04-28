@@ -19,18 +19,55 @@ function parseDate(raw) {
   if (typeof raw === 'number' && raw > 40000) return serialToISO(raw) + 'T12:00:00'
   const s = String(raw).trim()
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T12:00:00'
+  // try common date formats: MM/DD/YYYY, DD/MM/YYYY
+  const parts = s.split(/[\/\-]/)
+  if (parts.length === 3) {
+    const [a, b, c] = parts.map(Number)
+    // YYYY-MM-DD already handled above; try MM/DD/YYYY
+    if (c > 1900) return `${c}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}T12:00:00`
+  }
   const d = new Date(s)
   return isNaN(d) ? null : d.toISOString().slice(0, 10) + 'T12:00:00'
 }
 
+// Normalize header: lowercase, remove accents, trim
+function norm(s) {
+  return String(s).toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+// Map from canonical field name → accepted aliases
+const ALIASES = {
+  fecha:       ['fecha', 'date', 'fecha de pago', 'dia', 'day', 'periodo', 'f.'],
+  descripcion: ['descripcion', 'description', 'concepto', 'detail', 'detalle', 'comercio', 'merchant'],
+  monto:       ['monto', 'amount', 'valor', 'value', 'importe', 'total', 'costo', 'cost'],
+  tipo:        ['tipo', 'type', 'class', 'clase'],
+  categoria:   ['categoria', 'category', 'cat', 'rubro'],
+  cuenta:      ['cuenta', 'account', 'banco', 'bank', 'tarjeta'],
+  quien:       ['quien', 'who', 'persona', 'person', 'responsable'],
+  notas:       ['notas', 'notes', 'nota', 'note', 'comentario', 'comment'],
+}
+
+function buildHeaderMap(rawHeaders) {
+  const normed = rawHeaders.map(norm)
+  const map = {}
+  for (const [field, aliases] of Object.entries(ALIASES)) {
+    const i = normed.findIndex(h => aliases.includes(h))
+    if (i >= 0) map[field] = i
+  }
+  return map
+}
+
 function parseSheet(ws, categories, accounts) {
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-  if (!raw.length) return { rows: [], isSheet1: false }
+  if (!raw.length) return { rows: [], isSheet1: false, detectedHeaders: [] }
 
-  // Sheet1 format: no headers, col A = serial date, B = category, C = description, D = amount
+  // Sheet1 format: col A = serial date (no headers)
   const isSheet1 = typeof raw[0]?.[0] === 'number' && raw[0][0] > 40000
 
   let parsed = []
+  let detectedHeaders = []
+
   if (isSheet1) {
     parsed = raw
       .filter(r => typeof r[0] === 'number' && r[0] > 40000)
@@ -47,16 +84,20 @@ function parseSheet(ws, categories, accounts) {
         status:        'review',
       }))
   } else {
-    // Standard format with header row
-    const headers = (raw[0] || []).map(h => String(h).toLowerCase().trim())
-    const idx  = name => headers.indexOf(name)
-    const get  = (row, name) => { const i = idx(name); return i >= 0 ? String(row[i] ?? '').trim() : '' }
+    const rawHeaders = (raw[0] || [])
+    detectedHeaders = rawHeaders.map(h => String(h).trim()).filter(Boolean)
+    const hmap = buildHeaderMap(rawHeaders)
+
+    const get = (row, field) => {
+      const i = hmap[field]
+      return i !== undefined ? String(row[i] ?? '').trim() : ''
+    }
 
     parsed = raw.slice(1)
       .filter(r => r.some(c => c !== ''))
       .map(r => {
-        const rawDate = idx('fecha') >= 0 ? r[idx('fecha')] : ''
-        const isoTs   = rawDate ? parseDate(rawDate) : null
+        const rawDate = hmap['fecha'] !== undefined ? r[hmap['fecha']] : ''
+        const isoTs   = rawDate !== '' ? parseDate(rawDate) : null
         const rawAmt  = parseFloat(get(r, 'monto')) || 0
         const tipo    = (get(r, 'tipo') || 'expense').toLowerCase()
         return {
@@ -79,36 +120,40 @@ function parseSheet(ws, categories, accounts) {
     const cat  = matchName(r.category_name, categories)
     const acct = matchName(r.account_name, accounts)
     if (r.category_name) { cat ? catMatched++ : catUnmatched++ }
-    return { ...r, category_id: cat?.id || null, _resolved_acct_id: acct?.id || null, _cat_warn: !!r.category_name && !cat }
+    return {
+      ...r,
+      category_id:       cat?.id  || null,
+      _resolved_acct_id: acct?.id || null,
+      _cat_warn:         !!r.category_name && !cat,
+    }
   })
 
-  return { rows: resolved, isSheet1, catMatched, catUnmatched }
+  return { rows: resolved, isSheet1, catMatched, catUnmatched, detectedHeaders }
 }
 
-// ─── Steps: 'upload' → 'sheet' → 'preview' ───────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ImportModal({ onClose, onSave }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
 
-  const [step, setStep]           = useState('upload')   // upload | sheet | preview
-  const [wb, setWb]               = useState(null)       // workbook
+  const [step, setStep]             = useState('upload')
+  const [wb, setWb]                 = useState(null)
   const [sheetNames, setSheetNames] = useState([])
   const [selectedSheet, setSelectedSheet] = useState('')
-  const [rows, setRows]           = useState(null)
-  const [preview, setPreview]     = useState(null)
-  const [stats, setStats]         = useState(null)
-  const [dragOver, setDragOver]   = useState(false)
-  const [defaultAcct, setDefaultAcct] = useState('')
+  const [rows, setRows]             = useState(null)
+  const [preview, setPreview]       = useState(null)
+  const [stats, setStats]           = useState(null)
+  const [dragOver, setDragOver]     = useState(false)
+  const [defaultAcct, setDefaultAcct]     = useState('')
   const [defaultPerson, setDefaultPerson] = useState('Alexander')
-  const [saving, setSaving]       = useState(false)
-  const [error, setError]         = useState(null)
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState(null)
   const fileRef = useRef()
 
   const cadAccounts = accounts.filter(a => a.currency === 'CAD')
   const copAccounts = accounts.filter(a => a.currency === 'COP')
 
-  // Step 1 → load file, decide next step
   const loadFile = useCallback((f) => {
     setError(null)
     const reader = new FileReader()
@@ -120,15 +165,8 @@ export default function ImportModal({ onClose, onSave }) {
         setSheetNames(names)
 
         if (names.length === 1) {
-          // Only one sheet — parse directly
-          const { rows: r, ...s } = parseSheet(workbook.Sheets[names[0]], categories, accounts)
-          setSelectedSheet(names[0])
-          setRows(r)
-          setPreview(r.slice(0, 15))
-          setStats({ total: r.length, ...s })
-          setStep('preview')
+          applySheet(workbook, names[0])
         } else {
-          // Multiple sheets — let user pick
           setSelectedSheet(names[0])
           setStep('sheet')
         }
@@ -137,16 +175,19 @@ export default function ImportModal({ onClose, onSave }) {
       }
     }
     reader.readAsArrayBuffer(f)
-  }, [accounts, categories])
+  }, [accounts, categories]) // eslint-disable-line
 
-  // Step 2 → user picked a sheet
-  function handleSheetConfirm() {
-    if (!wb || !selectedSheet) return
-    const { rows: r, ...s } = parseSheet(wb.Sheets[selectedSheet], categories, accounts)
-    setRows(r)
-    setPreview(r.slice(0, 15))
-    setStats({ total: r.length, ...s })
+  function applySheet(workbook, sheetName) {
+    const result = parseSheet(workbook.Sheets[sheetName], categories, accounts)
+    setSelectedSheet(sheetName)
+    setRows(result.rows)
+    setPreview(result.rows.slice(0, 15))
+    setStats({ total: result.rows.length, ...result })
     setStep('preview')
+  }
+
+  function handleSheetConfirm() {
+    if (wb && selectedSheet) applySheet(wb, selectedSheet)
   }
 
   const handleDrop = (e) => {
@@ -157,15 +198,15 @@ export default function ImportModal({ onClose, onSave }) {
 
   async function handleImport() {
     if (!rows?.length) return
-    if (stats.isSheet1 && !defaultAcct) {
-      setError('Selecciona una cuenta antes de importar.')
+    if (!defaultAcct) {
+      setError('Selecciona una cuenta predeterminada antes de importar.')
       return
     }
     setSaving(true); setError(null)
     try {
       const toInsert = rows.map(({ _cat_warn, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
-        account_id: _resolved_acct_id || defaultAcct || null,
+        account_id: _resolved_acct_id || defaultAcct,
         person:     r.person || defaultPerson,
       }))
       await onSave(toInsert)
@@ -180,6 +221,7 @@ export default function ImportModal({ onClose, onSave }) {
   function reset() {
     setStep('upload'); setWb(null); setRows(null); setPreview(null)
     setStats(null); setError(null); setSheetNames([]); setSelectedSheet('')
+    setDefaultAcct(''); setDefaultPerson('Alexander')
   }
 
   return (
@@ -208,7 +250,7 @@ export default function ImportModal({ onClose, onSave }) {
         {step === 'sheet' && (
           <div>
             <p style={{ fontSize: 13, color: 'var(--ink-1)', marginBottom: 16 }}>
-              Tu archivo tiene <strong>{sheetNames.length} pestañas</strong>. Selecciona cuál contiene los movimientos:
+              Tu archivo tiene <strong>{sheetNames.length} pestañas</strong>. ¿Cuál contiene los movimientos?
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sheetNames.map(name => (
@@ -233,11 +275,34 @@ export default function ImportModal({ onClose, onSave }) {
         {/* ── Step 3: Preview ── */}
         {step === 'preview' && stats && (
           <>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
+            {/* Format info */}
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
               Pestaña: <strong style={{ color: 'var(--ink-1)' }}>{selectedSheet}</strong>
-              {' · '}Formato: <strong style={{ color: 'var(--ink-1)' }}>{stats.isSheet1 ? 'Sin encabezados (Sheet1)' : 'Con encabezados'}</strong>
+              {' · '}Formato: <strong style={{ color: 'var(--ink-1)' }}>{stats.isSheet1 ? 'Sin encabezados' : 'Con encabezados'}</strong>
             </div>
 
+            {/* Detected headers (only for standard format) */}
+            {!stats.isSheet1 && stats.detectedHeaders?.length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 12,
+                background: 'var(--bg-2)', borderRadius: 8, padding: '8px 12px' }}>
+                Columnas detectadas: {stats.detectedHeaders.map((h, i) => (
+                  <span key={i} style={{
+                    display: 'inline-block', margin: '2px 3px',
+                    padding: '1px 6px', borderRadius: 4,
+                    background: Object.values(ALIASES).flat().includes(norm(h))
+                      ? 'rgba(99,102,241,.18)' : 'var(--bg-1)',
+                    color: Object.values(ALIASES).flat().includes(norm(h))
+                      ? 'var(--accent)' : 'var(--ink-3)',
+                    border: '1px solid var(--border)',
+                  }}>{h}</span>
+                ))}
+                <span style={{ display: 'block', marginTop: 4, color: 'var(--ink-3)' }}>
+                  Columnas en <span style={{ color: 'var(--accent)' }}>morado</span> fueron reconocidas.
+                </span>
+              </div>
+            )}
+
+            {/* Stats */}
             <div className="import-stats">
               <div className="import-stat">
                 <div className="import-stat-num">{stats.total}</div>
@@ -257,39 +322,37 @@ export default function ImportModal({ onClose, onSave }) {
               )}
             </div>
 
-            {/* Sheet1 defaults */}
-            {stats.isSheet1 && (
-              <div className="form-grid" style={{ marginBottom: 14 }}>
-                <div className="form-field">
-                  <label>Cuenta (para todos los movimientos)</label>
-                  <select value={defaultAcct} onChange={e => setDefaultAcct(e.target.value)}>
-                    <option value="">— Seleccionar cuenta —</option>
-                    {cadAccounts.length > 0 && (
-                      <optgroup label="CAD">
-                        {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </optgroup>
-                    )}
-                    {copAccounts.length > 0 && (
-                      <optgroup label="COP">
-                        {copAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </optgroup>
-                    )}
-                  </select>
-                </div>
-                <div className="form-field">
-                  <label>Persona</label>
-                  <select value={defaultPerson} onChange={e => setDefaultPerson(e.target.value)}>
-                    <option value="Alexander">Alexander</option>
-                    <option value="Marcela">Marcela</option>
-                    <option value="Shared">Compartido</option>
-                  </select>
-                </div>
+            {/* Default account + person (always required) */}
+            <div className="form-grid" style={{ marginBottom: 14 }}>
+              <div className="form-field">
+                <label>Cuenta predeterminada {!stats.isSheet1 && '(para filas sin cuenta)'}</label>
+                <select value={defaultAcct} onChange={e => setDefaultAcct(e.target.value)}>
+                  <option value="">— Seleccionar cuenta —</option>
+                  {cadAccounts.length > 0 && (
+                    <optgroup label="CAD">
+                      {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </optgroup>
+                  )}
+                  {copAccounts.length > 0 && (
+                    <optgroup label="COP">
+                      {copAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
               </div>
-            )}
+              <div className="form-field">
+                <label>Persona predeterminada {!stats.isSheet1 && '(para filas sin persona)'}</label>
+                <select value={defaultPerson} onChange={e => setDefaultPerson(e.target.value)}>
+                  <option value="Alexander">Alexander</option>
+                  <option value="Marcela">Marcela</option>
+                  <option value="Shared">Compartido</option>
+                </select>
+              </div>
+            </div>
 
             {stats.total === 0 ? (
               <p style={{ color: 'var(--warn)', fontSize: 13, padding: '16px 0' }}>
-                No se encontraron filas con datos en esta pestaña. Intenta con otra.
+                No se encontraron filas con datos en esta pestaña.
               </p>
             ) : (
               <>
@@ -352,7 +415,7 @@ export default function ImportModal({ onClose, onSave }) {
             {saving ? 'Importando…' : `Importar ${rows.length} movimientos`}
           </button>
         )}
-        {step === 'preview' && stats?.total === 0 && (
+        {step === 'preview' && stats?.total === 0 && sheetNames.length > 1 && (
           <button type="button" className="btn ghost" onClick={() => setStep('sheet')}>
             ← Elegir otra pestaña
           </button>
@@ -361,3 +424,4 @@ export default function ImportModal({ onClose, onSave }) {
     </Modal>
   )
 }
+
