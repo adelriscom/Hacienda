@@ -73,5 +73,41 @@
     "colAcct": "Account", "colPerson": "Person", "colAmt": "Amount"
   },
   "person": { "shared": "Shared" },
-  "lang": { "label": "Language" }
+  "lang": { "label": "Language" },
+  "acct": {
+    "title": "Accounts",
+    "subtitle": "{{total}} accounts",
+    "addBtn": "Add account",
+    "loading": "Loading…",
+    "empty": "No accounts yet. Click «Add account» to get started.",
+    "cadSection": "CAD — Canadian Dollar",
+    "copSection": "COP — Colombian Peso",
+    "inactive": "Inactive",
+    "editBtn": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "types": {
+      "checking": "Checking",
+      "savings": "Savings",
+      "credit": "Credit",
+      "investment": "Investment",
+      "cash": "Cash"
+    },
+    "modal": {
+      "titleNew": "New account",
+      "titleEdit": "Edit account",
+      "name": "Account name",
+      "namePlaceholder": "e.g. RBC Chequing",
+      "type": "Account type",
+      "currency": "Currency",
+      "balance": "Current balance",
+      "creditLimit": "Credit limit",
+      "active": "Active account",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Add account",
+      "saveEdit": "Save changes",
+      "required": "Name, type and currency are required."
+    }
+  }
 }

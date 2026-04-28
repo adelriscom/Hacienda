@@ -73,5 +73,41 @@
     "colAcct": "Cuenta", "colPerson": "Quien", "colAmt": "Monto"
   },
   "person": { "shared": "Compartido" },
-  "lang": { "label": "Idioma" }
+  "lang": { "label": "Idioma" },
+  "acct": {
+    "title": "Cuentas",
+    "subtitle": "{{total}} cuentas",
+    "addBtn": "Agregar cuenta",
+    "loading": "Cargando…",
+    "empty": "Sin cuentas. Haz clic en «Agregar cuenta» para comenzar.",
+    "cadSection": "CAD — Dólar Canadiense",
+    "copSection": "COP — Peso Colombiano",
+    "inactive": "Inactiva",
+    "editBtn": "Editar",
+    "activate": "Activar",
+    "deactivate": "Desactivar",
+    "types": {
+      "checking": "Cuenta corriente",
+      "savings": "Ahorros",
+      "credit": "Crédito",
+      "investment": "Inversión",
+      "cash": "Efectivo"
+    },
+    "modal": {
+      "titleNew": "Nueva cuenta",
+      "titleEdit": "Editar cuenta",
+      "name": "Nombre de cuenta",
+      "namePlaceholder": "Ej. RBC Chequing",
+      "type": "Tipo de cuenta",
+      "currency": "Moneda",
+      "balance": "Saldo actual",
+      "creditLimit": "Límite de crédito",
+      "active": "Cuenta activa",
+      "cancel": "Cancelar",
+      "saving": "Guardando…",
+      "save": "Agregar cuenta",
+      "saveEdit": "Guardar cambios",
+      "required": "Nombre, tipo y moneda son obligatorios."
+    }
+  }
 }

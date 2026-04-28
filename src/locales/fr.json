@@ -73,5 +73,41 @@
     "colAcct": "Compte", "colPerson": "Personne", "colAmt": "Montant"
   },
   "person": { "shared": "Partagé" },
-  "lang": { "label": "Langue" }
+  "lang": { "label": "Langue" },
+  "acct": {
+    "title": "Comptes",
+    "subtitle": "{{total}} comptes",
+    "addBtn": "Ajouter un compte",
+    "loading": "Chargement…",
+    "empty": "Aucun compte. Cliquez sur «Ajouter un compte» pour commencer.",
+    "cadSection": "CAD — Dollar Canadien",
+    "copSection": "COP — Peso Colombien",
+    "inactive": "Inactif",
+    "editBtn": "Modifier",
+    "activate": "Activer",
+    "deactivate": "Désactiver",
+    "types": {
+      "checking": "Compte courant",
+      "savings": "Épargne",
+      "credit": "Crédit",
+      "investment": "Investissement",
+      "cash": "Espèces"
+    },
+    "modal": {
+      "titleNew": "Nouveau compte",
+      "titleEdit": "Modifier le compte",
+      "name": "Nom du compte",
+      "namePlaceholder": "ex. RBC Chequing",
+      "type": "Type de compte",
+      "currency": "Devise",
+      "balance": "Solde actuel",
+      "creditLimit": "Limite de crédit",
+      "active": "Compte actif",
+      "cancel": "Annuler",
+      "saving": "Enregistrement…",
+      "save": "Ajouter le compte",
+      "saveEdit": "Enregistrer les modifications",
+      "required": "Le nom, le type et la devise sont obligatoires."
+    }
+  }
 }
