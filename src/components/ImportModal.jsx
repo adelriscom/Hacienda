@@ -58,6 +58,19 @@ function buildHeaderMap(rawHeaders) {
   return map
 }
 
+// Find the row index where actual column headers live (skip title rows like "EXPENDITURES")
+function findHeaderRow(raw) {
+  const allAliases = new Set(Object.values(ALIASES).flat())
+  for (let i = 0; i < Math.min(raw.length, 6); i++) {
+    if (raw[i].some(h => allAliases.has(norm(String(h))))) return i
+  }
+  return 0
+}
+
+function parseAmount(raw) {
+  return parseFloat(String(raw).replace(/[$,\s]/g, '')) || 0
+}
+
 function parseSheet(ws, categories, accounts) {
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
   if (!raw.length) return { rows: [], isSheet1: false, detectedHeaders: [] }
@@ -75,7 +88,7 @@ function parseSheet(ws, categories, accounts) {
         occurred_at:   new Date(serialToISO(r[0]) + 'T12:00:00').toISOString(),
         category_name: String(r[1] || '').trim(),
         description:   String(r[2] || '').trim(),
-        amount:        r[3] !== '' ? -Math.abs(parseFloat(r[3]) || 0) : 0,
+        amount:        r[3] !== '' ? -Math.abs(parseAmount(r[3])) : 0,
         type:          'expense',
         account_name:  '',
         person:        '',
@@ -84,22 +97,33 @@ function parseSheet(ws, categories, accounts) {
         status:        'review',
       }))
   } else {
-    const rawHeaders = (raw[0] || [])
-    detectedHeaders = rawHeaders.map(h => String(h).trim()).filter(Boolean)
-    const hmap = buildHeaderMap(rawHeaders)
+    // Find real header row (skip title rows like "EXPENDITURES")
+    const headerRowIdx  = findHeaderRow(raw)
+    const fullHeaderRow = raw[headerRowIdx] || []
+
+    // Anchor on the DATE column so we ignore any table to its left
+    const dateColIdx = fullHeaderRow.findIndex(h => ALIASES.fecha.includes(norm(String(h))))
+    const startCol   = dateColIdx >= 0 ? dateColIdx : 0
+
+    const rawHeaders = fullHeaderRow.slice(startCol)
+    detectedHeaders  = rawHeaders.map(h => String(h).trim()).filter(Boolean)
+    const hmap       = buildHeaderMap(rawHeaders)  // indices relative to startCol
 
     const get = (row, field) => {
       const i = hmap[field]
-      return i !== undefined ? String(row[i] ?? '').trim() : ''
+      return i !== undefined ? String(row[startCol + i] ?? '').trim() : ''
     }
 
-    parsed = raw.slice(1)
-      .filter(r => r.some(c => c !== ''))
+    parsed = raw.slice(headerRowIdx + 1)
+      // Only keep rows that have a value in the DATE column (filters out left-side table rows)
+      .filter(r => dateColIdx >= 0
+        ? r[dateColIdx] !== '' && r[dateColIdx] != null
+        : r.some(c => c !== ''))
       .map(r => {
-        const rawDate = hmap['fecha'] !== undefined ? r[hmap['fecha']] : ''
-        const isoTs   = rawDate !== '' ? parseDate(rawDate) : null
-        const rawAmt  = parseFloat(get(r, 'monto')) || 0
-        const tipo    = (get(r, 'tipo') || 'expense').toLowerCase()
+        const rawDateVal = dateColIdx >= 0 ? r[dateColIdx] : ''
+        const isoTs  = rawDateVal !== '' ? parseDate(rawDateVal) : null
+        const rawAmt = parseAmount(get(r, 'monto'))
+        const tipo   = (get(r, 'tipo') || 'expense').toLowerCase()
         return {
           occurred_at:   isoTs ? new Date(isoTs).toISOString() : new Date().toISOString(),
           category_name: get(r, 'categoria'),
