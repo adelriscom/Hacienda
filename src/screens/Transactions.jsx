@@ -1,11 +1,16 @@
+import { useState } from 'react'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
+import NewTransactionModal from '../components/NewTransactionModal'
+import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
 
 const FILTERS = ['Todos', 'Ingresos', 'Gastos', 'Transferencias', 'Tarjeta de crédito', 'Por revisar']
 
 export default function Transactions() {
-  const { transactions, loading } = useTransactions()
+  const { transactions, loading, addTransaction, addTransactions } = useTransactions()
+  const [showNew, setShowNew]       = useState(false)
+  const [showImport, setShowImport] = useState(false)
 
   const ghost   = transactions.filter(t => t.status === 'ghost').length
   const review  = transactions.filter(t => t.status === 'review').length
@@ -14,7 +19,14 @@ export default function Transactions() {
 
   return (
     <>
-      <Topbar greet="Transacciones" date={`Abril 2026 · ${total} movimientos · ${review} por revisar`} />
+      <Topbar greet="Transacciones" date={`Abril 2026 · ${total} movimientos · ${review} por revisar`}>
+        <button className="btn ghost sm" onClick={() => setShowImport(true)}>
+          <Icon name="upload" size={12} /> Importar
+        </button>
+        <button className="btn primary sm" onClick={() => setShowNew(true)}>
+          <Icon name="plus" size={12} /> Nuevo movimiento
+        </button>
+      </Topbar>
 
       <div className="card filters-bar">
         <div className="filter-tabs">
@@ -32,9 +44,9 @@ export default function Transactions() {
       </div>
 
       <div className="coverage-strip">
-        <CoverageItem label="Conciliados"        bar={total ? matched/total*100 : 94} color="var(--pos)"      num={<><span className="num">{matched}</span> <span>/ {total}</span></>} />
-        <CoverageItem label="Por revisar"        bar={total ? review/total*100  : 20} color="var(--warn)"     num={<><span className="num warn-text">{review}</span> <span>pendientes</span></>} />
-        <CoverageItem label="Cargos fantasma"    bar={total ? ghost/total*100   : 12} color="var(--accent-2)" num={<><span className="num" style={{ color:'var(--accent-2)' }}>{ghost}</span> <span>detectados</span></>} />
+        <CoverageItem label="Conciliados"     bar={total ? matched/total*100 : 0} color="var(--pos)"      num={<><span className="num">{matched}</span> <span>/ {total}</span></>} />
+        <CoverageItem label="Por revisar"     bar={total ? review/total*100  : 0} color="var(--warn)"     num={<><span className="num warn-text">{review}</span> <span>pendientes</span></>} />
+        <CoverageItem label="Cargos fantasma" bar={total ? ghost/total*100   : 0} color="var(--accent-2)" num={<><span className="num" style={{ color:'var(--accent-2)' }}>{ghost}</span> <span>detectados</span></>} />
       </div>
 
       <div className="card tx-card">
@@ -49,9 +61,26 @@ export default function Transactions() {
         </div>
         {loading
           ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div>
-          : transactions.map(t => <TxRow key={t.id} t={t} />)
+          : transactions.length === 0
+            ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>
+                Sin movimientos. Importa un archivo o agrega uno manualmente.
+              </div>
+            : transactions.map(t => <TxRow key={t.id} t={t} />)
         }
       </div>
+
+      {showNew && (
+        <NewTransactionModal
+          onClose={() => setShowNew(false)}
+          onSave={addTransaction}
+        />
+      )}
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onSave={addTransactions}
+        />
+      )}
     </>
   )
 }

@@ -1,6 +1,6 @@
 import Icon from './Icon'
 
-export default function Topbar({ greet, date, action = 'Nuevo movimiento', onAction }) {
+export default function Topbar({ greet, date, action, onAction, children }) {
   return (
     <div className="topbar">
       <div className="greet">
@@ -13,9 +13,12 @@ export default function Topbar({ greet, date, action = 'Nuevo movimiento', onAct
         <input placeholder="Buscar transacción, categoría…" />
       </div>
       <button className="icon-btn"><Icon name="bell" size={15} /><span className="dot" /></button>
-      <button className="btn primary" onClick={onAction}>
-        <Icon name="plus" size={14} /> {action}
-      </button>
+      {children}
+      {action && (
+        <button className="btn primary" onClick={onAction}>
+          <Icon name="plus" size={14} /> {action}
+        </button>
+      )}
     </div>
   )
 }
