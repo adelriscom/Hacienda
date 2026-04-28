@@ -102,9 +102,18 @@ function parseSheet(ws, categories, accounts) {
     const headerRowIdx  = findHeaderRow(raw)
     const fullHeaderRow = raw[headerRowIdx] || []
 
-    // Anchor on the DATE column so we ignore any table to its left
-    const dateColIdx = fullHeaderRow.findIndex(h => ALIASES.fecha.includes(norm(String(h))))
-    const startCol   = dateColIdx >= 0 ? dateColIdx : 0
+    // Find the DATE column that also has CATEGORY nearby (handles side-by-side tables
+    // where the left table might also have a DATE column)
+    let dateColIdx = -1
+    for (let i = 0; i < fullHeaderRow.length; i++) {
+      if (!ALIASES.fecha.includes(norm(String(fullHeaderRow[i])))) continue
+      const window = fullHeaderRow.slice(i, i + 7).map(h => norm(String(h)))
+      if (window.some(h => ALIASES.categoria.includes(h))) { dateColIdx = i; break }
+    }
+    // Fallback: first DATE column found
+    if (dateColIdx < 0)
+      dateColIdx = fullHeaderRow.findIndex(h => ALIASES.fecha.includes(norm(String(h))))
+    const startCol = dateColIdx >= 0 ? dateColIdx : 0
 
     const rawHeaders = fullHeaderRow.slice(startCol)
     detectedHeaders  = rawHeaders.map(h => String(h).trim()).filter(Boolean)
