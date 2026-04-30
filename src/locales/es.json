@@ -68,6 +68,7 @@
     "showingRows": "Mostrando 15 de {{total}} filas",
     "importBtn": "Importar {{count}} movimientos", "importing": "Importando…",
     "selectAccountFirst": "Selecciona una cuenta antes de importar.",
+    "noAccountNote": "(sin cuenta — asignable después)",
     "parseError": "No se pudo leer el archivo: {{msg}}",
     "colDate": "Fecha", "colDesc": "Descripción", "colCat": "Categoría",
     "colAcct": "Cuenta", "colPerson": "Quien", "colAmt": "Monto"

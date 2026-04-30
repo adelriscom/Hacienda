@@ -234,10 +234,6 @@ export default function ImportModal({ onClose, onSave }) {
 
   async function handleImport() {
     if (!rows?.length) return
-    if (!defaultAcct) {
-      setError(t('import.selectAccountFirst'))
-      return
-    }
     setSaving(true); setError(null)
     try {
       // Auto-create any categories that didn't match existing ones
@@ -252,7 +248,7 @@ export default function ImportModal({ onClose, onSave }) {
       const toInsert = rows.map(({ _cat_warn, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
         category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
-        account_id:  _resolved_acct_id || defaultAcct,
+        account_id:  _resolved_acct_id || defaultAcct || null,
         person:      r.person || defaultPerson,
       }))
       await onSave(toInsert)
@@ -450,6 +446,11 @@ export default function ImportModal({ onClose, onSave }) {
         {step === 'preview' && stats?.total > 0 && (
           <button type="button" className="btn primary" onClick={handleImport} disabled={saving}>
             {saving ? t('import.importing') : t('import.importBtn', { count: rows.length })}
+            {!defaultAcct && !saving && (
+              <span style={{ fontSize: 10, opacity: 0.75, display: 'block', lineHeight: 1 }}>
+                {t('import.noAccountNote')}
+              </span>
+            )}
           </button>
         )}
         {step === 'preview' && stats?.total === 0 && sheetNames.length > 1 && (

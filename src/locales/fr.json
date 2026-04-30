@@ -68,6 +68,7 @@
     "showingRows": "Affichage de 15 sur {{total}} lignes",
     "importBtn": "Importer {{count}} transactions", "importing": "Importation…",
     "selectAccountFirst": "Sélectionnez un compte avant d'importer.",
+    "noAccountNote": "(sans compte — assignable plus tard)",
     "parseError": "Impossible de lire le fichier : {{msg}}",
     "colDate": "Date", "colDesc": "Description", "colCat": "Catégorie",
     "colAcct": "Compte", "colPerson": "Personne", "colAmt": "Montant"
