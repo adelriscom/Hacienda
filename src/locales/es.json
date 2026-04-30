@@ -72,6 +72,13 @@
     "colDate": "Fecha", "colDesc": "Descripción", "colCat": "Categoría",
     "colAcct": "Cuenta", "colPerson": "Quien", "colAmt": "Monto"
   },
+  "reset": {
+    "sub": "Ingresa tu nueva contraseña.",
+    "password": "Nueva contraseña", "confirm": "Confirmar contraseña",
+    "save": "Actualizar contraseña", "saving": "Actualizando…",
+    "mismatch": "Las contraseñas no coinciden.",
+    "success": "Contraseña actualizada. Redirigiendo…"
+  },
   "person": { "shared": "Compartido" },
   "lang": { "label": "Idioma" },
   "acct": {

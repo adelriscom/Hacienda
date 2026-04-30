@@ -72,6 +72,13 @@
     "colDate": "Date", "colDesc": "Description", "colCat": "Catégorie",
     "colAcct": "Compte", "colPerson": "Personne", "colAmt": "Montant"
   },
+  "reset": {
+    "sub": "Entrez votre nouveau mot de passe.",
+    "password": "Nouveau mot de passe", "confirm": "Confirmer le mot de passe",
+    "save": "Mettre à jour", "saving": "Mise à jour…",
+    "mismatch": "Les mots de passe ne correspondent pas.",
+    "success": "Mot de passe mis à jour. Redirection…"
+  },
   "person": { "shared": "Partagé" },
   "lang": { "label": "Langue" },
   "acct": {

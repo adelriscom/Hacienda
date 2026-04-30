@@ -72,6 +72,13 @@
     "colDate": "Date", "colDesc": "Description", "colCat": "Category",
     "colAcct": "Account", "colPerson": "Person", "colAmt": "Amount"
   },
+  "reset": {
+    "sub": "Enter your new password below.",
+    "password": "New password", "confirm": "Confirm password",
+    "save": "Update password", "saving": "Updating…",
+    "mismatch": "Passwords don't match.",
+    "success": "Password updated. Redirecting…"
+  },
   "person": { "shared": "Shared" },
   "lang": { "label": "Language" },
   "acct": {

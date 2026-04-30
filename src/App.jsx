@@ -2,11 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import Login from './screens/Login'
 import Shell from './components/Shell'
+import ResetPassword from './screens/ResetPassword'
 
 function RequireAuth({ children }) {
-  const { session, loading } = useAuth()
+  const { session, loading, recoveryMode } = useAuth()
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--ink-2)' }}>Cargando…</div>
-  return session ? children : <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/login" replace />
+  if (recoveryMode) return <ResetPassword />
+  return children
 }
 
 export default function App() {
