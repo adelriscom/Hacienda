@@ -27,7 +27,7 @@ export function useCategories() {
       const user_id = session?.user?.id
       const { data: inserted, error } = await supabase
         .from('categories')
-        .insert(missing.map(name => ({ name, color: '#94a3b8', user_id })))
+        .insert(missing.map(name => ({ name, color: '#94a3b8', icon: '', user_id })))
         .select()
       if (error) throw error
       ;(inserted || []).forEach(c => { existingMap[c.name.toLowerCase()] = c.id })
