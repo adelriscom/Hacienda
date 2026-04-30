@@ -102,15 +102,16 @@ function parseSheet(ws, categories, accounts) {
     const headerRowIdx  = findHeaderRow(raw)
     const fullHeaderRow = raw[headerRowIdx] || []
 
-    // Find the DATE column that also has CATEGORY nearby (handles side-by-side tables
-    // where the left table might also have a DATE column)
+    // Find the DATE column that has CATEGORY within the next 4 columns.
+    // Uses a tight window so that a side-by-side income table (DATE, DESCRIPTION, AMOUNT)
+    // is skipped while the expenditure table (DATE, CATEGORY, DESCRIPTION, AMOUNT) is found.
     let dateColIdx = -1
     for (let i = 0; i < fullHeaderRow.length; i++) {
       if (!ALIASES.fecha.includes(norm(String(fullHeaderRow[i])))) continue
-      const window = fullHeaderRow.slice(i, i + 7).map(h => norm(String(h)))
-      if (window.some(h => ALIASES.categoria.includes(h))) { dateColIdx = i; break }
+      const nearby = fullHeaderRow.slice(i + 1, i + 4).map(h => norm(String(h)))
+      if (nearby.some(h => ALIASES.categoria.includes(h))) { dateColIdx = i; break }
     }
-    // Fallback: first DATE column found
+    // Fallback: first DATE column if no DATE+CATEGORY pair found
     if (dateColIdx < 0)
       dateColIdx = fullHeaderRow.findIndex(h => ALIASES.fecha.includes(norm(String(h))))
     const startCol = dateColIdx >= 0 ? dateColIdx : 0
@@ -169,7 +170,7 @@ function parseSheet(ws, categories, accounts) {
 
 export default function ImportModal({ onClose, onSave }) {
   const { accounts } = useAccounts()
-  const { categories } = useCategories()
+  const { categories, ensureCategories } = useCategories()
   const { t } = useTranslation()
 
   const [step, setStep]             = useState('upload')
@@ -239,10 +240,20 @@ export default function ImportModal({ onClose, onSave }) {
     }
     setSaving(true); setError(null)
     try {
+      // Auto-create any categories that didn't match existing ones
+      const unmatchedNames = [...new Set(
+        rows.filter(r => r._cat_warn && r.category_name).map(r => r.category_name)
+      )]
+      let catMap = {}
+      if (unmatchedNames.length > 0) {
+        catMap = await ensureCategories(unmatchedNames)
+      }
+
       const toInsert = rows.map(({ _cat_warn, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
-        account_id: _resolved_acct_id || defaultAcct,
-        person:     r.person || defaultPerson,
+        category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
+        account_id:  _resolved_acct_id || defaultAcct,
+        person:      r.person || defaultPerson,
       }))
       await onSave(toInsert)
       onClose()

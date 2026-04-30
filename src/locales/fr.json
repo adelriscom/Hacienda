@@ -83,6 +83,8 @@
     "cadSection": "CAD — Dollar Canadien",
     "copSection": "COP — Peso Colombien",
     "inactive": "Inactif",
+    "showInactive": "Afficher inactifs ({{count}})",
+    "hideInactive": "Masquer inactifs",
     "editBtn": "Modifier",
     "activate": "Activer",
     "deactivate": "Désactiver",

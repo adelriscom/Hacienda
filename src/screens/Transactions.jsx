@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
@@ -6,29 +6,42 @@ import NewTransactionModal from '../components/NewTransactionModal'
 import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
 
-export default function Transactions() {
+export default function Transactions({ type }) {
   const { transactions, loading, addTransaction, addTransactions } = useTransactions()
   const [showNew, setShowNew]       = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [activeFilter, setActiveFilter] = useState(type || 'all')
+  const [activePerson, setActivePerson] = useState('all')
   const { t } = useTranslation()
 
-  const FILTERS = [
-    t('transactions.filters.all'),
-    t('transactions.filters.income'),
-    t('transactions.filters.expenses'),
-    t('transactions.filters.transfers'),
-    t('transactions.filters.creditCard'),
-    t('transactions.filters.review'),
+  useEffect(() => { setActiveFilter(type || 'all') }, [type])
+
+  const FILTER_DEFS = [
+    { key: 'all',      label: t('transactions.filters.all'),       test: () => true },
+    { key: 'income',   label: t('transactions.filters.income'),    test: tx => tx.type === 'income' },
+    { key: 'expense',  label: t('transactions.filters.expenses'),  test: tx => tx.type === 'expense' },
+    { key: 'transfer', label: t('transactions.filters.transfers'), test: tx => tx.type === 'transfer' },
+    { key: 'review',   label: t('transactions.filters.review'),    test: tx => tx.status === 'review' },
   ]
 
-  const ghost   = transactions.filter(tx => tx.status === 'ghost').length
-  const review  = transactions.filter(tx => tx.status === 'review').length
-  const matched = transactions.filter(tx => tx.status === 'match').length
-  const total   = transactions.length
+  const PERSONS = ['all', 'Alexander', 'Marcela', 'Shared']
+
+  const activeDef = FILTER_DEFS.find(f => f.key === activeFilter) || FILTER_DEFS[0]
+  const filtered = transactions
+    .filter(activeDef.test)
+    .filter(tx => activePerson === 'all' || tx.person === activePerson)
+
+  const ghost   = filtered.filter(tx => tx.status === 'ghost').length
+  const review  = filtered.filter(tx => tx.status === 'review').length
+  const matched = filtered.filter(tx => tx.status === 'match').length
+  const total   = filtered.length
+
+  const titleMap = { expense: t('transactions.filters.expenses'), income: t('transactions.filters.income') }
+  const pageTitle = titleMap[type] || t('transactions.title')
 
   return (
     <>
-      <Topbar greet={t('transactions.title')}
+      <Topbar greet={pageTitle}
         date={t('transactions.subtitle', { month: 'April 2026', total, review })}>
         <button className="btn ghost sm" onClick={() => setShowImport(true)}>
           <Icon name="upload" size={12} /> {t('transactions.importBtn')}
@@ -38,12 +51,13 @@ export default function Transactions() {
         </button>
       </Topbar>
 
-      <div className="card filters-bar">
+      <div className="card filters-bar" style={{ flexWrap: 'wrap', rowGap: 8 }}>
         <div className="filter-tabs">
-          {FILTERS.map((f, i) => (
-            <button key={f} className={`tab ${i === 0 ? 'active' : ''}`}>
-              {f}
-              {i === 5 && <span className="filter-dot" />}
+          {FILTER_DEFS.map(f => (
+            <button key={f.key} className={`tab ${activeFilter === f.key ? 'active' : ''}`}
+              onClick={() => setActiveFilter(f.key)}>
+              {f.label}
+              {f.key === 'review' && review > 0 && <span className="filter-dot" />}
             </button>
           ))}
         </div>
@@ -51,6 +65,20 @@ export default function Transactions() {
         <button className="btn ghost sm"><Icon name="filter" size={12} /> {t('transactions.filterBtns.category')}</button>
         <button className="btn ghost sm"><Icon name="account" size={12} /> {t('transactions.filterBtns.account')}</button>
         <button className="btn ghost sm"><Icon name="calendar" size={12} /> April 2026</button>
+
+        <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>
+            {t('newTx.person')}:
+          </span>
+          {PERSONS.map(p => (
+            <button key={p}
+              className={`tab ${activePerson === p ? 'active' : ''}`}
+              style={{ fontSize: 11, padding: '3px 10px' }}
+              onClick={() => setActivePerson(p)}>
+              {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="coverage-strip">
@@ -77,9 +105,9 @@ export default function Transactions() {
         </div>
         {loading
           ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.loading')}</div>
-          : transactions.length === 0
+          : filtered.length === 0
             ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.empty')}</div>
-            : transactions.map(tx => <TxRow key={tx.id} t={tx} />)
+            : filtered.map(tx => <TxRow key={tx.id} t={tx} />)
         }
       </div>
 

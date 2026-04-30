@@ -24,14 +24,22 @@ const TYPE_COLOR = {
 export default function Accounts() {
   const { accounts, loading, addAccount, updateAccount, toggleActive } = useAccounts()
   const { t } = useTranslation()
-  const [editing, setEditing] = useState(null) // null | 'new' | account object
+  const [editing, setEditing]         = useState(null)
+  const [showInactive, setShowInactive] = useState(false)
 
-  const cadAccounts = accounts.filter(a => a.currency === 'CAD')
-  const copAccounts = accounts.filter(a => a.currency === 'COP')
+  const inactiveCount   = accounts.filter(a => !a.is_active).length
+  const visibleAccounts = showInactive ? accounts : accounts.filter(a => a.is_active)
+  const cadAccounts = visibleAccounts.filter(a => a.currency === 'CAD')
+  const copAccounts = visibleAccounts.filter(a => a.currency === 'COP')
 
   return (
     <>
       <Topbar greet={t('acct.title')} date={t('acct.subtitle', { total: accounts.length })}>
+        {inactiveCount > 0 && (
+          <button className="btn ghost sm" onClick={() => setShowInactive(v => !v)}>
+            {showInactive ? t('acct.hideInactive') : t('acct.showInactive', { count: inactiveCount })}
+          </button>
+        )}
         <button className="btn primary sm" onClick={() => setEditing('new')}>
           <Icon name="plus" size={12} /> {t('acct.addBtn')}
         </button>
