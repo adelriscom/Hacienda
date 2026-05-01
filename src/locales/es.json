@@ -49,7 +49,11 @@
     "person": "Persona", "shared": "Compartido",
     "recurring": "Recurrente", "notes": "Notas (opcional)", "notesPlaceholder": "Detalles adicionales…",
     "cancel": "Cancelar", "saving": "Guardando…", "save": "Guardar movimiento",
-    "required": "Descripción, monto y cuenta son obligatorios."
+    "editTitle": "Editar movimiento", "saveEdit": "Guardar cambios",
+    "delete": "Eliminar", "confirmDelete": "Confirmar eliminación",
+    "status": "Estado", "statusMatch": "Conciliado", "statusReview": "Por revisar",
+    "statusGhost": "Cargo fantasma", "statusDuplicate": "Duplicado",
+    "required": "Descripción y monto son obligatorios."
   },
   "import": {
     "title": "Importar movimientos",

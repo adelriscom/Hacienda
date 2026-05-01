@@ -49,7 +49,11 @@
     "person": "Personne", "shared": "Partagé",
     "recurring": "Récurrent", "notes": "Notes (optionnel)", "notesPlaceholder": "Détails supplémentaires…",
     "cancel": "Annuler", "saving": "Enregistrement…", "save": "Enregistrer",
-    "required": "Description, montant et compte sont obligatoires."
+    "editTitle": "Modifier la transaction", "saveEdit": "Enregistrer les modifications",
+    "delete": "Supprimer", "confirmDelete": "Confirmer la suppression",
+    "status": "Statut", "statusMatch": "Réconcilié", "statusReview": "À réviser",
+    "statusGhost": "Charge fantôme", "statusDuplicate": "Doublon",
+    "required": "Description et montant sont obligatoires."
   },
   "import": {
     "title": "Importer des transactions",

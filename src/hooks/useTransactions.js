@@ -51,5 +51,17 @@ export function useTransactions() {
     await load()
   }
 
-  return { transactions, loading, error, refresh: load, addTransaction, addTransactions }
+  async function updateTransaction(id, values) {
+    const { error } = await supabase.from('transactions').update(values).eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  async function deleteTransaction(id) {
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  return { transactions, loading, error, refresh: load, addTransaction, addTransactions, updateTransaction, deleteTransaction }
 }

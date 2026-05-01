@@ -49,7 +49,11 @@
     "person": "Person", "shared": "Shared",
     "recurring": "Recurring", "notes": "Notes (optional)", "notesPlaceholder": "Additional details…",
     "cancel": "Cancel", "saving": "Saving…", "save": "Save transaction",
-    "required": "Description, amount and account are required."
+    "editTitle": "Edit transaction", "saveEdit": "Save changes",
+    "delete": "Delete", "confirmDelete": "Confirm delete",
+    "status": "Status", "statusMatch": "Reconciled", "statusReview": "To review",
+    "statusGhost": "Ghost charge", "statusDuplicate": "Duplicate",
+    "required": "Description and amount are required."
   },
   "import": {
     "title": "Import transactions",

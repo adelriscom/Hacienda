@@ -6,53 +6,64 @@ import { useCategories } from '../hooks/useCategories'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-export default function NewTransactionModal({ onClose, onSave }) {
+function initForm(tx) {
+  if (!tx) return {
+    occurred_at: today(), description: '', amount: '', type: 'expense',
+    account_id: '', category_id: '', person: 'Alexander',
+    notes: '', is_recurring: false, status: 'match',
+  }
+  return {
+    occurred_at:  new Date(tx.occurred_at).toISOString().slice(0, 10),
+    description:  tx.description || '',
+    amount:       Math.abs(tx.amount).toString(),
+    type:         tx.type || 'expense',
+    account_id:   tx.account_id || '',
+    category_id:  tx.category_id || '',
+    person:       tx.person || 'Alexander',
+    notes:        tx.notes || '',
+    is_recurring: tx.is_recurring || false,
+    status:       tx.status || 'review',
+  }
+}
+
+export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelete, transaction }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { t } = useTranslation()
+  const isEdit = !!transaction
 
-  const [form, setForm] = useState({
-    occurred_at: today(),
-    description: '',
-    amount: '',
-    type: 'expense',
-    account_id: '',
-    category_id: '',
-    person: 'Alexander',
-    notes: '',
-    is_recurring: false,
-    status: 'match',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [form, setForm]       = useState(() => initForm(transaction))
+  const [saving, setSaving]   = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+  const [error, setError]     = useState(null)
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.description || !form.amount || !form.account_id) {
-      setError(t('newTx.required'))
-      return
+    if (!form.description || !form.amount) {
+      setError(t('newTx.required')); return
     }
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     try {
       const signedAmount = form.type === 'expense' || form.type === 'transfer'
         ? -Math.abs(parseFloat(form.amount))
         :  Math.abs(parseFloat(form.amount))
-
-      await onSave({
+      const payload = {
         occurred_at:  new Date(form.occurred_at + 'T12:00:00').toISOString(),
         description:  form.description,
         amount:       signedAmount,
         type:         form.type,
-        account_id:   form.account_id,
+        account_id:   form.account_id || null,
         category_id:  form.category_id || null,
         person:       form.person,
         notes:        form.notes || null,
         is_recurring: form.is_recurring,
-        status:       'match',
-      })
+        status:       isEdit ? form.status : 'match',
+      }
+      if (isEdit) await onUpdate(transaction.id, payload)
+      else await onSave(payload)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -61,22 +72,39 @@ export default function NewTransactionModal({ onClose, onSave }) {
     }
   }
 
-  const cadAccounts = accounts.filter(a => a.currency === 'CAD')
-  const copAccounts = accounts.filter(a => a.currency === 'COP')
+  async function handleDelete() {
+    setDeleting(true); setError(null)
+    try {
+      await onDelete(transaction.id)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+      setDeleting(false)
+    }
+  }
+
+  const cadAccounts = accounts.filter(a => a.currency === 'CAD' && a.is_active)
+  const copAccounts = accounts.filter(a => a.currency === 'COP' && a.is_active)
 
   const types = [
-    ['expense',  t('newTx.expense')],
-    ['income',   t('newTx.income')],
-    ['transfer', t('newTx.transfer')],
+    ['expense', t('newTx.expense')],
+    ['income',  t('newTx.income')],
+    ['transfer',t('newTx.transfer')],
+  ]
+
+  const statuses = [
+    ['match',     t('newTx.statusMatch')],
+    ['review',    t('newTx.statusReview')],
+    ['ghost',     t('newTx.statusGhost')],
+    ['duplicate', t('newTx.statusDuplicate')],
   ]
 
   return (
-    <Modal title={t('newTx.title')} onClose={onClose}>
+    <Modal title={isEdit ? t('newTx.editTitle') : t('newTx.title')} onClose={onClose}>
       <form onSubmit={handleSubmit}>
         <div className="modal-body">
           <div className="form-grid">
 
-            {/* Type */}
             <div className="form-field span-2">
               <label>{t('newTx.type')}</label>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -94,31 +122,27 @@ export default function NewTransactionModal({ onClose, onSave }) {
               </div>
             </div>
 
-            {/* Date */}
             <div className="form-field">
               <label>{t('newTx.date')}</label>
               <input type="date" value={form.occurred_at}
                 onChange={e => set('occurred_at', e.target.value)} required />
             </div>
 
-            {/* Amount */}
             <div className="form-field">
               <label>{t('newTx.amount')}</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={form.amount} onChange={e => set('amount', e.target.value)} required />
             </div>
 
-            {/* Description */}
             <div className="form-field span-2">
               <label>{t('newTx.description')}</label>
               <input type="text" placeholder={t('newTx.descriptionPlaceholder')}
                 value={form.description} onChange={e => set('description', e.target.value)} required />
             </div>
 
-            {/* Account */}
             <div className="form-field">
               <label>{t('newTx.account')}</label>
-              <select value={form.account_id} onChange={e => set('account_id', e.target.value)} required>
+              <select value={form.account_id} onChange={e => set('account_id', e.target.value)}>
                 <option value="">{t('newTx.accountSelect')}</option>
                 {cadAccounts.length > 0 && (
                   <optgroup label="CAD">
@@ -133,7 +157,6 @@ export default function NewTransactionModal({ onClose, onSave }) {
               </select>
             </div>
 
-            {/* Category */}
             <div className="form-field">
               <label>{t('newTx.category')}</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)}>
@@ -142,7 +165,6 @@ export default function NewTransactionModal({ onClose, onSave }) {
               </select>
             </div>
 
-            {/* Person */}
             <div className="form-field">
               <label>{t('newTx.person')}</label>
               <select value={form.person} onChange={e => set('person', e.target.value)}>
@@ -152,17 +174,24 @@ export default function NewTransactionModal({ onClose, onSave }) {
               </select>
             </div>
 
-            {/* Recurring */}
-            <div className="form-field" style={{ justifyContent: 'flex-end' }}>
-              <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.is_recurring}
-                  onChange={e => set('is_recurring', e.target.checked)}
-                  style={{ width: 'auto', height: 'auto' }} />
-                {t('newTx.recurring')}
-              </label>
-            </div>
+            {isEdit ? (
+              <div className="form-field">
+                <label>{t('newTx.status')}</label>
+                <select value={form.status} onChange={e => set('status', e.target.value)}>
+                  {statuses.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="form-field" style={{ justifyContent: 'flex-end' }}>
+                <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.is_recurring}
+                    onChange={e => set('is_recurring', e.target.checked)}
+                    style={{ width: 'auto', height: 'auto' }} />
+                  {t('newTx.recurring')}
+                </label>
+              </div>
+            )}
 
-            {/* Notes */}
             <div className="form-field span-2">
               <label>{t('newTx.notes')}</label>
               <textarea placeholder={t('newTx.notesPlaceholder')}
@@ -174,9 +203,23 @@ export default function NewTransactionModal({ onClose, onSave }) {
         </div>
 
         <div className="modal-footer">
+          {isEdit && !confirmDel && (
+            <button type="button" className="btn ghost"
+              style={{ marginRight: 'auto', color: 'var(--neg)' }}
+              onClick={() => setConfirmDel(true)}>
+              {t('newTx.delete')}
+            </button>
+          )}
+          {isEdit && confirmDel && (
+            <button type="button" className="btn ghost"
+              style={{ marginRight: 'auto', color: 'var(--neg)' }}
+              onClick={handleDelete} disabled={deleting}>
+              {deleting ? '…' : t('newTx.confirmDelete')}
+            </button>
+          )}
           <button type="button" className="btn ghost" onClick={onClose}>{t('newTx.cancel')}</button>
           <button type="submit" className="btn primary" disabled={saving}>
-            {saving ? t('newTx.saving') : t('newTx.save')}
+            {saving ? t('newTx.saving') : isEdit ? t('newTx.saveEdit') : t('newTx.save')}
           </button>
         </div>
       </form>

@@ -7,9 +7,10 @@ import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
 
 export default function Transactions({ type }) {
-  const { transactions, loading, addTransaction, addTransactions } = useTransactions()
+  const { transactions, loading, addTransaction, addTransactions, updateTransaction, deleteTransaction } = useTransactions()
   const [showNew, setShowNew]       = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [editingTx, setEditingTx]   = useState(null)
   const [activeFilter, setActiveFilter] = useState(type || 'all')
   const [activePerson, setActivePerson] = useState('all')
   const { t } = useTranslation()
@@ -107,7 +108,7 @@ export default function Transactions({ type }) {
           ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.loading')}</div>
           : filtered.length === 0
             ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('transactions.empty')}</div>
-            : filtered.map(tx => <TxRow key={tx.id} t={tx} />)
+            : filtered.map(tx => <TxRow key={tx.id} t={tx} onEdit={setEditingTx} />)
         }
       </div>
 
@@ -116,6 +117,14 @@ export default function Transactions({ type }) {
       )}
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onSave={addTransactions} />
+      )}
+      {editingTx && (
+        <NewTransactionModal
+          transaction={editingTx}
+          onClose={() => setEditingTx(null)}
+          onUpdate={updateTransaction}
+          onDelete={deleteTransaction}
+        />
       )}
     </>
   )
@@ -131,7 +140,7 @@ function CoverageItem({ label, bar, color, num }) {
   )
 }
 
-function TxRow({ t: tx }) {
+function TxRow({ t: tx, onEdit }) {
   const { t } = useTranslation()
   const isGhost  = tx.status === 'ghost'
   const isReview = tx.status === 'review'
@@ -172,7 +181,7 @@ function TxRow({ t: tx }) {
         {tx.amount > 0 ? '+' : '−'}${Math.abs(tx.amount).toFixed(2)}
       </div>
       <div className="tx-col-act">
-        <button className="icon-btn sm-btn"><Icon name="more" size={14} /></button>
+        <button className="icon-btn sm-btn" onClick={() => onEdit(tx)}><Icon name="more" size={14} /></button>
       </div>
     </div>
   )
