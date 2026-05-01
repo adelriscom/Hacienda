@@ -6,6 +6,7 @@ import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
 import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
+import { useHousehold } from '../lib/household'
 
 function fmtMonth(ym) {
   const [y, m] = ym.split('-')
@@ -33,6 +34,7 @@ const selStyle = (active) => ({
 
 export default function Transactions({ type }) {
   const { transactions, loading, addTransaction, addTransactions, updateTransaction, deleteTransaction } = useTransactions()
+  const { isFamily, myName } = useHousehold()
   const [showNew, setShowNew]         = useState(false)
   const [showImport, setShowImport]   = useState(false)
   const [editingTx, setEditingTx]     = useState(null)
@@ -43,6 +45,9 @@ export default function Transactions({ type }) {
   const [filterAcct, setFilterAcct]     = useState('')
   const { t }    = useTranslation()
   const location = useLocation()
+
+  // Reset person filter when switching between personal/family mode
+  useEffect(() => { setActivePerson('all') }, [isFamily])
 
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
 
@@ -149,18 +154,20 @@ export default function Transactions({ type }) {
             onClick={() => setFilterMonth(m => shiftMonth(m, 1))}>→</button>
         </div>
 
-        {/* Person filter */}
-        <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>{t('newTx.person')}:</span>
-          {PERSONS.map(p => (
-            <button key={p}
-              className={`tab ${activePerson === p ? 'active' : ''}`}
-              style={{ fontSize: 11, padding: '3px 10px' }}
-              onClick={() => setActivePerson(p)}>
-              {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
-            </button>
-          ))}
-        </div>
+        {/* Person filter — only in Family mode */}
+        {isFamily && (
+          <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>{t('newTx.person')}:</span>
+            {PERSONS.map(p => (
+              <button key={p}
+                className={`tab ${activePerson === p ? 'active' : ''}`}
+                style={{ fontSize: 11, padding: '3px 10px' }}
+                onClick={() => setActivePerson(p)}>
+                {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="coverage-strip">

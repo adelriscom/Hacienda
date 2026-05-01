@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { useTransactions } from '../hooks/useTransactions'
+import { useHousehold } from '../lib/household'
 
 function nowMonth() {
   const now = new Date()
@@ -24,9 +25,12 @@ const PERSONS = ['all', 'Alexander', 'Marcela', 'Shared']
 
 export default function ReviewScreen() {
   const { transactions, loading, updateTransaction } = useTransactions()
+  const { isFamily } = useHousehold()
   const { t } = useTranslation()
   const [filterMonth,  setFilterMonth]  = useState(nowMonth)
   const [activePerson, setActivePerson] = useState('all')
+
+  useEffect(() => { setActivePerson('all') }, [isFamily])
 
   const monthTxs = useMemo(
     () => transactions.filter(tx => tx.occurred_at.startsWith(filterMonth)),
@@ -91,23 +95,25 @@ export default function ReviewScreen() {
               }
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 4, padding: '0 0 12px', borderBottom: '1px solid var(--line)' }}>
-            {PERSONS.map(p => {
-              const count = p === 'all'
-                ? monthTxs.filter(tx => tx.status === 'review').length
-                : monthTxs.filter(tx => tx.status === 'review' && tx.person === p).length
-              if (p !== 'all' && count === 0) return null
-              return (
-                <button key={p}
-                  className={`tab ${activePerson === p ? 'active' : ''}`}
-                  style={{ fontSize: 11, padding: '3px 10px' }}
-                  onClick={() => setActivePerson(p)}>
-                  {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
-                  {count > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>{count}</span>}
-                </button>
-              )
-            })}
-          </div>
+          {isFamily && (
+            <div style={{ display: 'flex', gap: 4, padding: '0 0 12px', borderBottom: '1px solid var(--line)' }}>
+              {PERSONS.map(p => {
+                const count = p === 'all'
+                  ? monthTxs.filter(tx => tx.status === 'review').length
+                  : monthTxs.filter(tx => tx.status === 'review' && tx.person === p).length
+                if (p !== 'all' && count === 0) return null
+                return (
+                  <button key={p}
+                    className={`tab ${activePerson === p ? 'active' : ''}`}
+                    style={{ fontSize: 11, padding: '3px 10px' }}
+                    onClick={() => setActivePerson(p)}>
+                    {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
+                    {count > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>{count}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {loading ? (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('review.loading')}</div>
@@ -124,8 +130,8 @@ export default function ReviewScreen() {
 
         {/* Right column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Person split */}
-          <div className="card shared-card">
+          {/* Person split — only in Family mode */}
+          {isFamily && <div className="card shared-card">
             <div className="card-h">
               <div><h3>{t('review.splitTitle')}</h3><p>{fmtMonth(filterMonth)}</p></div>
             </div>
@@ -161,7 +167,7 @@ export default function ReviewScreen() {
                 {t('review.noData')}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Month stats */}
           <div className="card">
