@@ -51,7 +51,7 @@
 .tx-card { padding: 0; overflow: hidden; }
 .tx-header, .tx-row {
   display: grid;
-  grid-template-columns: 80px 1.6fr 1.1fr 1.1fr 1.1fr 110px 36px;
+  grid-template-columns: 28px 80px 1.6fr 1.1fr 1.1fr 1.1fr 110px 36px;
   align-items: center;
   gap: 12px;
   padding: 12px 18px;
@@ -70,6 +70,8 @@
 .tx-row:hover { background: var(--bg-2); }
 .tx-row.ghost-row-tx { background: rgba(168, 85, 247, 0.05); }
 .tx-row.review-row-tx { background: rgba(245, 158, 11, 0.05); }
+.tx-row.tx-row-selected { background: rgba(99, 102, 241, 0.08); }
+.tx-row.tx-row-selected:hover { background: rgba(99, 102, 241, 0.13); }
 
 .tx-date { font-size: 12.5px; font-weight: 500; }
 .tx-time { font-size: 11px; color: var(--ink-3); }
