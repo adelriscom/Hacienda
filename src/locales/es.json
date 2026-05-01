@@ -15,7 +15,12 @@
     "noAccount": "¿Sin cuenta?", "hasAccount": "¿Ya tienes cuenta?",
     "register": "Regístrate", "loginLink": "Inicia sesión"
   },
-  "topbar": { "search": "Buscar transacción, categoría…" },
+  "topbar": {
+    "search": "Buscar transacción, categoría…",
+    "searching": "Buscando…",
+    "noResults": "Sin resultados.",
+    "searchHint": "Haz clic para abrir"
+  },
   "transactions": {
     "title": "Transacciones",
     "subtitle": "{{month}} · {{total}} movimientos · {{review}} por revisar",

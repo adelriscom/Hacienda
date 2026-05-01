@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
@@ -40,9 +41,22 @@ export default function Transactions({ type }) {
   const [filterMonth, setFilterMonth]   = useState(nowMonth)
   const [filterCat, setFilterCat]       = useState('')
   const [filterAcct, setFilterAcct]     = useState('')
-  const { t } = useTranslation()
+  const { t }    = useTranslation()
+  const location = useLocation()
 
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
+
+  // Handle navigation from global search: open edit modal for the selected transaction
+  useEffect(() => {
+    const { openTxId, month } = location.state || {}
+    if (!openTxId || !transactions.length) return
+    if (month) setFilterMonth(month)
+    const tx = transactions.find(t => t.id === openTxId)
+    if (tx) {
+      setEditingTx(tx)
+      window.history.replaceState({}, '') // clear state so refresh doesn't re-open
+    }
+  }, [location.state, transactions])
 
   const FILTER_DEFS = [
     { key: 'all',      label: t('transactions.filters.all'),       test: () => true },

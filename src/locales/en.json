@@ -15,7 +15,12 @@
     "noAccount": "No account?", "hasAccount": "Already have an account?",
     "register": "Register", "loginLink": "Sign in"
   },
-  "topbar": { "search": "Search transaction, category…" },
+  "topbar": {
+    "search": "Search transaction, category…",
+    "searching": "Searching…",
+    "noResults": "No results found.",
+    "searchHint": "Click a result to open it"
+  },
   "transactions": {
     "title": "Transactions",
     "subtitle": "{{month}} · {{total}} transactions · {{review}} to review",

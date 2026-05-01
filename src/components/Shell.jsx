@@ -38,8 +38,9 @@ export default function Shell() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"  element={<Dashboard />} />
-            <Route path="/expenses"   element={<Transactions type="expense" />} />
-            <Route path="/income"     element={<Transactions type="income" />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/expenses"    element={<Transactions type="expense" />} />
+            <Route path="/income"      element={<Transactions type="income" />} />
             <Route path="/budgets"    element={<Budgets />} />
             <Route path="/calendar"   element={<CalendarScreen />} />
             <Route path="/review"     element={<ReviewShared />} />
