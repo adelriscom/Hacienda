@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import Icon from './Icon'
+import { useSidebarCounts } from '../hooks/useSidebarCounts'
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -18,16 +19,19 @@ export default function Sidebar() {
 
   const email = session?.user?.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
+  const counts = useSidebarCounts()
+
+  const badge = (n) => (n === null || n === 0) ? undefined : String(n)
 
   const principal = [
     { id: 'dashboard', path: '/dashboard', icon: 'grid',    label: t('nav.dashboard') },
-    { id: 'expenses',  path: '/expenses',  icon: 'expense', label: t('nav.expenses'),  badge: '24' },
-    { id: 'income',    path: '/income',    icon: 'income',  label: t('nav.income'),    badge: '8' },
+    { id: 'expenses',  path: '/expenses',  icon: 'expense', label: t('nav.expenses'),  badge: badge(counts.expenses) },
+    { id: 'income',    path: '/income',    icon: 'income',  label: t('nav.income'),    badge: badge(counts.income) },
     { id: 'budgets',   path: '/budgets',   icon: 'budget',  label: t('nav.budgets') },
   ]
   const tools = [
-    { id: 'calendar',  path: '/calendar',  icon: 'calendar',  label: t('nav.calendar'),  badge: '3', badgeKind: 'accent' },
-    { id: 'review',    path: '/review',    icon: 'review',    label: t('nav.review'),    badge: '5', badgeKind: 'warn' },
+    { id: 'calendar',  path: '/calendar',  icon: 'calendar',  label: t('nav.calendar') },
+    { id: 'review',    path: '/review',    icon: 'review',    label: t('nav.review'),  badge: badge(counts.review), badgeKind: 'warn' },
     { id: 'reports',   path: '/reports',   icon: 'report',    label: t('nav.reports') },
     { id: 'recurring', path: '/recurring', icon: 'recurring', label: t('nav.recurring') },
     { id: 'accounts',    path: '/accounts',   icon: 'account',  label: t('nav.accounts') },
