@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
+import { HouseholdProvider } from './lib/household'
 import Login from './screens/Login'
 import Shell from './components/Shell'
 import ResetPassword from './screens/ResetPassword'
@@ -15,6 +16,7 @@ function RequireAuth({ children }) {
 export default function App() {
   return (
     <AuthProvider>
+      <HouseholdProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -25,6 +27,7 @@ export default function App() {
           } />
         </Routes>
       </BrowserRouter>
+      </HouseholdProvider>
     </AuthProvider>
   )
 }

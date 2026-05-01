@@ -2,20 +2,24 @@ import { useState, useEffect } from 'react'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useHousehold } from '../lib/household'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
+  const { isFamily, myUserId } = useHousehold()
 
   useEffect(() => {
     async function load() {
       const now   = new Date()
       const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
-      const { data: txs } = await supabase
+      let query = supabase
         .from('transactions')
         .select('amount, type, occurred_at, category_id, account_id, category:categories(name, color)')
         .gte('occurred_at', start.toISOString())
         .order('occurred_at', { ascending: true })
+      if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
+      const { data: txs } = await query
 
       if (!txs?.length) { setStats({}); return }
 
@@ -59,7 +63,7 @@ export default function Dashboard() {
       setStats({ income, expenses, expDelta, categories, months, txCount: cur.length })
     }
     load()
-  }, [])
+  }, [isFamily, myUserId])
 
   const fmt  = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)

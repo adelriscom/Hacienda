@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useHousehold } from '../lib/household'
 
 function nowMonth() {
   const now = new Date()
@@ -39,6 +40,7 @@ export default function Reports() {
   const [focusMonth, setFocusMonth] = useState(nowMonth)
   const [txs,     setTxs]     = useState([])
   const [loading, setLoading] = useState(true)
+  const { isFamily, myUserId } = useHousehold()
 
   // Load 6 months of data centred on focusMonth (5 before + focusMonth)
   useEffect(() => {
@@ -48,18 +50,20 @@ export default function Reports() {
       const { start } = monthRange(oldest)
       const { end }   = monthRange(focusMonth)
 
-      const { data } = await supabase
+      let query = supabase
         .from('transactions')
         .select('occurred_at, amount, type, category_id, person, category:categories(name, color)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .order('occurred_at', { ascending: true })
+      if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
 
+      const { data } = await query
       setTxs(data || [])
       setLoading(false)
     }
     load()
-  }, [focusMonth])
+  }, [focusMonth, isFamily, myUserId])
 
   // Focus month transactions
   const { start: fStart, end: fEnd } = monthRange(focusMonth)

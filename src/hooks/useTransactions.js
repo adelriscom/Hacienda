@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useHousehold } from '../lib/household'
 
 function computeTag(t) {
   if (t.status === 'ghost')    return { kind: 'ghost',  key: 'ghost' }
@@ -15,14 +16,17 @@ export function useTransactions() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { isFamily, myUserId } = useHousehold()
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    let query = supabase
       .from('transactions')
       .select('*, account:accounts(name), category:categories(name, color)')
       .order('occurred_at', { ascending: false })
-      .limit(1000)
+      .limit(2000)
+    if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
+    const { data, error } = await query
 
     if (error) {
       setError(error)
@@ -30,7 +34,7 @@ export function useTransactions() {
       setTransactions((data || []).map(t => ({ ...t, tag: computeTag(t) })))
     }
     setLoading(false)
-  }, [])
+  }, [isFamily, myUserId])
 
   useEffect(() => { load() }, [load])
 

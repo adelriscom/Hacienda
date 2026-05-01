@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
+import { useHousehold } from '../lib/household'
 
 function nowMonth() {
   const now = new Date()
@@ -26,6 +27,7 @@ export default function CalendarScreen() {
   const [filterMonth, setFilterMonth] = useState(nowMonth)
   const [txs,     setTxs]     = useState([])
   const [loading, setLoading] = useState(true)
+  const { isFamily, myUserId } = useHousehold()
 
   useEffect(() => {
     async function load() {
@@ -34,18 +36,20 @@ export default function CalendarScreen() {
       const start  = `${filterMonth}-01`
       const end    = new Date(y, m, 1).toISOString().slice(0, 10)
 
-      const { data } = await supabase
+      let query = supabase
         .from('transactions')
         .select('id, occurred_at, description, amount, type, category:categories(name, color)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .order('occurred_at', { ascending: true })
+      if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
 
+      const { data } = await query
       setTxs(data || [])
       setLoading(false)
     }
     load()
-  }, [filterMonth])
+  }, [filterMonth, isFamily, myUserId])
 
   // Group by day number
   const byDay = useMemo(() => {

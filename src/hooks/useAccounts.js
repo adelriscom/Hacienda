@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useHousehold } from '../lib/household'
 
 export function useAccounts() {
   const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
+  const { isFamily, myUserId } = useHousehold()
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('accounts')
-      .select('*')
-      .order('currency')
-      .order('name')
+    let query = supabase.from('accounts').select('*').order('currency').order('name')
+    if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
+    const { data } = await query
     setAccounts(data || [])
     setLoading(false)
-  }, [])
+  }, [isFamily, myUserId])
 
   useEffect(() => { load() }, [load])
 

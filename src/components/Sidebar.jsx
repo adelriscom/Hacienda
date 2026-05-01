@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { useHousehold } from '../lib/household'
 import Icon from './Icon'
 import { useSidebarCounts } from '../hooks/useSidebarCounts'
 
@@ -17,9 +18,10 @@ export default function Sidebar() {
   const { session } = useAuth()
   const { t, i18n } = useTranslation()
 
-  const email = session?.user?.email ?? ''
+  const email    = session?.user?.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
-  const counts = useSidebarCounts()
+  const counts   = useSidebarCounts()
+  const { household, members, myName, viewMode, setViewMode, isFamily } = useHousehold()
 
   const badge = (n) => (n === null || n === 0) ? undefined : String(n)
 
@@ -66,6 +68,47 @@ export default function Sidebar() {
       {tools.map(it => <Item key={it.id} it={it} />)}
 
       <div className="sb-spacer" />
+
+      {/* Household view toggle */}
+      {household && (
+        <div style={{ padding: '0 16px 14px' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-3)', marginBottom: 8 }}>
+            {household.name}
+          </div>
+          {/* Member avatars */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+            {members.map(m => (
+              <div key={m.user_id} title={m.display_name} style={{
+                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                background: m.display_name === 'Alexander'
+                  ? 'linear-gradient(135deg,#6366f1,#a855f7)'
+                  : 'linear-gradient(135deg,#ec4899,#f97316)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: 'white',
+                opacity: isFamily || m.display_name === myName ? 1 : 0.35,
+                transition: 'opacity .2s',
+              }}>
+                {m.display_name.slice(0, 2).toUpperCase()}
+              </div>
+            ))}
+          </div>
+          {/* Toggle */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['personal', 'family'].map(mode => (
+              <button key={mode} onClick={() => setViewMode(mode)}
+                style={{
+                  flex: 1, height: 26, borderRadius: 6, border: '1px solid',
+                  borderColor: viewMode === mode ? 'var(--accent)' : 'var(--border)',
+                  background: viewMode === mode ? 'rgba(99,102,241,.15)' : 'transparent',
+                  color: viewMode === mode ? 'var(--accent)' : 'var(--ink-3)',
+                  fontSize: 10.5, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize',
+                }}>
+                {mode === 'family' ? '👨‍👩 Family' : '👤 Personal'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Language selector */}
       <div style={{ display: 'flex', gap: 4, padding: '0 16px 12px', justifyContent: 'center' }}>
