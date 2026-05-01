@@ -20,10 +20,13 @@ function shiftMonth(ym, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+const PERSONS = ['all', 'Alexander', 'Marcela', 'Shared']
+
 export default function ReviewScreen() {
   const { transactions, loading, updateTransaction } = useTransactions()
   const { t } = useTranslation()
-  const [filterMonth, setFilterMonth] = useState(nowMonth)
+  const [filterMonth,  setFilterMonth]  = useState(nowMonth)
+  const [activePerson, setActivePerson] = useState('all')
 
   const monthTxs = useMemo(
     () => transactions.filter(tx => tx.occurred_at.startsWith(filterMonth)),
@@ -31,8 +34,10 @@ export default function ReviewScreen() {
   )
 
   const reviewTxs = useMemo(
-    () => monthTxs.filter(tx => tx.status === 'review'),
-    [monthTxs]
+    () => monthTxs
+      .filter(tx => tx.status === 'review')
+      .filter(tx => activePerson === 'all' || tx.person === activePerson),
+    [monthTxs, activePerson]
   )
 
   const personSplit = useMemo(() => {
@@ -48,8 +53,13 @@ export default function ReviewScreen() {
   const pct = (v) => totalSpent ? Math.round(v / totalSpent * 100) : 0
   const fmtAmt = (n) => '$' + n.toLocaleString('en-CA', { maximumFractionDigits: 0 })
 
-  const statMatch = monthTxs.filter(t => t.status === 'match').length
-  const statGhost = monthTxs.filter(t => t.status === 'ghost').length
+  const personMonthTxs = useMemo(
+    () => activePerson === 'all' ? monthTxs : monthTxs.filter(t => t.person === activePerson),
+    [monthTxs, activePerson]
+  )
+
+  const statMatch = personMonthTxs.filter(t => t.status === 'match').length
+  const statGhost = personMonthTxs.filter(t => t.status === 'ghost').length
 
   return (
     <>
@@ -80,6 +90,23 @@ export default function ReviewScreen() {
                 : <><Icon name="check" size={10} /> {t('review.allClear')}</>
               }
             </span>
+          </div>
+          <div style={{ display: 'flex', gap: 4, padding: '0 0 12px', borderBottom: '1px solid var(--line)' }}>
+            {PERSONS.map(p => {
+              const count = p === 'all'
+                ? monthTxs.filter(tx => tx.status === 'review').length
+                : monthTxs.filter(tx => tx.status === 'review' && tx.person === p).length
+              if (p !== 'all' && count === 0) return null
+              return (
+                <button key={p}
+                  className={`tab ${activePerson === p ? 'active' : ''}`}
+                  style={{ fontSize: 11, padding: '3px 10px' }}
+                  onClick={() => setActivePerson(p)}>
+                  {p === 'all' ? t('transactions.filters.all') : p === 'Shared' ? t('person.shared') : p}
+                  {count > 0 && <span style={{ marginLeft: 4, opacity: 0.7 }}>{count}</span>}
+                </button>
+              )
+            })}
           </div>
 
           {loading ? (
@@ -140,7 +167,7 @@ export default function ReviewScreen() {
           <div className="card">
             <div className="card-h"><div><h3>{t('review.monthStats')}</h3><p>{fmtMonth(filterMonth)}</p></div></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-              <StatRow label={t('review.statTotal')}  value={monthTxs.length} />
+              <StatRow label={t('review.statTotal')}  value={personMonthTxs.length} />
               <StatRow label={t('review.statReview')} value={reviewTxs.length} tone="warn" />
               <StatRow label={t('review.statGhost')}  value={statGhost}        tone="accent" />
               <StatRow label={t('review.statMatch')}  value={statMatch}        tone="pos" />
