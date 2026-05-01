@@ -22,7 +22,7 @@ export function useTransactions() {
       .from('transactions')
       .select('*, account:accounts(name), category:categories(name, color)')
       .order('occurred_at', { ascending: false })
-      .limit(200)
+      .limit(1000)
 
     if (error) {
       setError(error)
