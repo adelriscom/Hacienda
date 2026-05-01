@@ -43,16 +43,15 @@ export default function Recurring() {
       ) : (
         <div className="grid-2">
           {/* Income */}
-          <Section title={t('recurring.incomeSection')} items={incomeItems} t={t} />
-          {/* Expenses */}
-          <Section title={t('recurring.expenseSection')} items={expenseItems} t={t} />
+          <Section title={t('recurring.incomeSection')}  items={incomeItems}  onRemove={removeRecurring} t={t} />
+          <Section title={t('recurring.expenseSection')} items={expenseItems} onRemove={removeRecurring} t={t} />
         </div>
       )}
     </>
   )
 }
 
-function Section({ title, items, t }) {
+function Section({ title, items, onRemove, t }) {
   if (items.length === 0) return null
   return (
     <div className="card">
@@ -63,14 +62,13 @@ function Section({ title, items, t }) {
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {items.map(item => <RecurringRow key={item.id} item={item} t={t} />)}
+        {items.map(item => <RecurringRow key={item.id} item={item} onRemove={onRemove} t={t} />)}
       </div>
     </div>
   )
 }
 
-function RecurringRow({ item, t }) {
-  const { removeRecurring } = useRecurring()
+function RecurringRow({ item, onRemove, t }) {
   const [confirming, setConfirming] = useState(false)
   const color = item.category?.color || 'var(--accent)'
   const isIncome = item.amount > 0
@@ -157,7 +155,7 @@ function RecurringRow({ item, t }) {
         {confirming ? (
           <div style={{ display: 'flex', gap: 4 }}>
             <button className="btn ghost sm" style={{ fontSize: 11, color: 'var(--neg)' }}
-              onClick={() => removeRecurring(item.id)}>
+              onClick={() => onRemove(item.id)}>
               {t('recurring.confirm')}
             </button>
             <button className="btn ghost sm" style={{ fontSize: 11 }}
