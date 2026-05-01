@@ -245,11 +245,12 @@ export default function ImportModal({ onClose, onSave }) {
         catMap = await ensureCategories(unmatchedNames)
       }
 
+      const VALID_PERSONS = new Set(['Alexander', 'Marcela', 'Shared'])
       const toInsert = rows.map(({ _cat_warn, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
         category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
         account_id:  _resolved_acct_id || defaultAcct || null,
-        person:      r.person || defaultPerson,
+        person:      VALID_PERSONS.has(r.person) ? r.person : defaultPerson,
       }))
       await onSave(toInsert)
       onClose()
