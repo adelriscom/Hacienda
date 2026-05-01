@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
@@ -6,13 +6,40 @@ import NewTransactionModal from '../components/NewTransactionModal'
 import ImportModal from '../components/ImportModal'
 import { useTransactions } from '../hooks/useTransactions'
 
+function fmtMonth(ym) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })
+}
+
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function nowMonth() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+const selStyle = (active) => ({
+  height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid',
+  borderColor: active ? 'var(--accent)' : 'var(--border)',
+  background: active ? 'rgba(99,102,241,.1)' : 'var(--bg-2)',
+  color: active ? 'var(--accent)' : 'var(--ink-2)',
+  fontSize: 12, cursor: 'pointer',
+})
+
 export default function Transactions({ type }) {
   const { transactions, loading, addTransaction, addTransactions, updateTransaction, deleteTransaction } = useTransactions()
-  const [showNew, setShowNew]       = useState(false)
-  const [showImport, setShowImport] = useState(false)
-  const [editingTx, setEditingTx]   = useState(null)
+  const [showNew, setShowNew]         = useState(false)
+  const [showImport, setShowImport]   = useState(false)
+  const [editingTx, setEditingTx]     = useState(null)
   const [activeFilter, setActiveFilter] = useState(type || 'all')
   const [activePerson, setActivePerson] = useState('all')
+  const [filterMonth, setFilterMonth]   = useState(nowMonth)
+  const [filterCat, setFilterCat]       = useState('')
+  const [filterAcct, setFilterAcct]     = useState('')
   const { t } = useTranslation()
 
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
@@ -27,10 +54,31 @@ export default function Transactions({ type }) {
 
   const PERSONS = ['all', 'Alexander', 'Marcela', 'Shared']
 
+  const uniqueCats = useMemo(() => {
+    const seen = new Map()
+    transactions.forEach(tx => {
+      if (tx.category && tx.category_id && !seen.has(tx.category_id))
+        seen.set(tx.category_id, { id: tx.category_id, name: tx.category.name })
+    })
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [transactions])
+
+  const uniqueAccts = useMemo(() => {
+    const seen = new Map()
+    transactions.forEach(tx => {
+      if (tx.account && tx.account_id && !seen.has(tx.account_id))
+        seen.set(tx.account_id, { id: tx.account_id, name: tx.account.name })
+    })
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [transactions])
+
   const activeDef = FILTER_DEFS.find(f => f.key === activeFilter) || FILTER_DEFS[0]
   const filtered = transactions
+    .filter(tx => tx.occurred_at.startsWith(filterMonth))
     .filter(activeDef.test)
     .filter(tx => activePerson === 'all' || tx.person === activePerson)
+    .filter(tx => !filterCat  || tx.category_id === filterCat)
+    .filter(tx => !filterAcct || tx.account_id  === filterAcct)
 
   const ghost   = filtered.filter(tx => tx.status === 'ghost').length
   const review  = filtered.filter(tx => tx.status === 'review').length
@@ -43,7 +91,7 @@ export default function Transactions({ type }) {
   return (
     <>
       <Topbar greet={pageTitle}
-        date={t('transactions.subtitle', { month: 'April 2026', total, review })}>
+        date={t('transactions.subtitle', { month: fmtMonth(filterMonth), total, review })}>
         <button className="btn ghost sm" onClick={() => setShowImport(true)}>
           <Icon name="upload" size={12} /> {t('transactions.importBtn')}
         </button>
@@ -63,14 +111,33 @@ export default function Transactions({ type }) {
           ))}
         </div>
         <div className="filter-spacer" />
-        <button className="btn ghost sm"><Icon name="filter" size={12} /> {t('transactions.filterBtns.category')}</button>
-        <button className="btn ghost sm"><Icon name="account" size={12} /> {t('transactions.filterBtns.account')}</button>
-        <button className="btn ghost sm"><Icon name="calendar" size={12} /> April 2026</button>
 
-        <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>
-            {t('newTx.person')}:
+        {/* Category filter */}
+        <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selStyle(!!filterCat)}>
+          <option value="">{t('transactions.filterBtns.category')}</option>
+          {uniqueCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+
+        {/* Account filter */}
+        <select value={filterAcct} onChange={e => setFilterAcct(e.target.value)} style={selStyle(!!filterAcct)}>
+          <option value="">{t('transactions.filterBtns.account')}</option>
+          {uniqueAccts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+
+        {/* Month navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button className="btn ghost sm" style={{ padding: '0 8px' }}
+            onClick={() => setFilterMonth(m => shiftMonth(m, -1))}>←</button>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', padding: '0 6px', minWidth: 90, textAlign: 'center' }}>
+            {fmtMonth(filterMonth)}
           </span>
+          <button className="btn ghost sm" style={{ padding: '0 8px' }}
+            onClick={() => setFilterMonth(m => shiftMonth(m, 1))}>→</button>
+        </div>
+
+        {/* Person filter */}
+        <div style={{ width: '100%', display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>{t('newTx.person')}:</span>
           {PERSONS.map(p => (
             <button key={p}
               className={`tab ${activePerson === p ? 'active' : ''}`}
