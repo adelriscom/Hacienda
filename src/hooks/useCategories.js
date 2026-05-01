@@ -13,8 +13,26 @@ export function useCategories() {
 
   useEffect(() => { load() }, [load])
 
-  // Ensures all given names exist in the DB. Inserts missing ones and returns
-  // a lowercase-name → id map covering both existing and newly created categories.
+  async function addCategory(name, color) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const user_id = session?.user?.id
+    const { error } = await supabase.from('categories').insert([{ name: name.trim(), color, icon: '', user_id }])
+    if (error) throw error
+    await load()
+  }
+
+  async function updateCategory(id, values) {
+    const { error } = await supabase.from('categories').update(values).eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  async function deleteCategory(id) {
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
   async function ensureCategories(names) {
     const existingMap = {}
     categories.forEach(c => { existingMap[c.name.toLowerCase()] = c.id })
@@ -37,5 +55,5 @@ export function useCategories() {
     return existingMap
   }
 
-  return { categories, loading, ensureCategories }
+  return { categories, loading, addCategory, updateCategory, deleteCategory, ensureCategories }
 }

@@ -8,6 +8,7 @@ import Reconciliation from '../screens/Reconciliation'
 import CalendarScreen from '../screens/Calendar'
 import ReviewShared from '../screens/Review'
 import AccountsScreen from '../screens/Accounts'
+import CategoriesScreen from '../screens/Categories'
 
 const ACCENTS = {
   indigo:  { a: '#6366f1', b: '#a855f7', c: '#ec4899' },
@@ -42,7 +43,8 @@ export default function Shell() {
             <Route path="/review"     element={<ReviewShared />} />
             <Route path="/reports"    element={<Reconciliation />} />
             <Route path="/recurring"  element={<Reconciliation />} />
-            <Route path="/accounts"   element={<AccountsScreen />} />
+            <Route path="/accounts"    element={<AccountsScreen />} />
+            <Route path="/categories"  element={<CategoriesScreen />} />
           </Routes>
         </main>
       </div>

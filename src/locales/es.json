@@ -4,7 +4,8 @@
     "principal": "Principal", "tools": "Herramientas",
     "dashboard": "Dashboard", "expenses": "Gastos", "income": "Ingresos",
     "budgets": "Presupuestos", "calendar": "Calendario", "review": "Por revisar",
-    "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas"
+    "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas",
+    "categories": "Categorías"
   },
   "login": {
     "tagline": "Control familiar de finanzas",
@@ -86,6 +87,28 @@
   },
   "person": { "shared": "Compartido" },
   "lang": { "label": "Idioma" },
+  "cat": {
+    "title": "Categorías",
+    "subtitle": "{{total}} categorías",
+    "addBtn": "Agregar categoría",
+    "loading": "Cargando…",
+    "empty": "Sin categorías. Haz clic en «Agregar categoría» para comenzar.",
+    "modal": {
+      "titleNew": "Nueva categoría",
+      "titleEdit": "Editar categoría",
+      "name": "Nombre",
+      "namePlaceholder": "Ej. Mercado",
+      "color": "Color",
+      "customColor": "Personalizado:",
+      "cancel": "Cancelar",
+      "saving": "Guardando…",
+      "save": "Agregar categoría",
+      "saveEdit": "Guardar cambios",
+      "delete": "Eliminar",
+      "confirmDelete": "Confirmar eliminación",
+      "required": "El nombre es obligatorio."
+    }
+  },
   "acct": {
     "title": "Cuentas",
     "subtitle": "{{total}} cuentas",

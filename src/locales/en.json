@@ -4,7 +4,8 @@
     "principal": "Main", "tools": "Tools",
     "dashboard": "Dashboard", "expenses": "Expenses", "income": "Income",
     "budgets": "Budgets", "calendar": "Calendar", "review": "Review",
-    "reports": "Reports", "recurring": "Recurring", "accounts": "Accounts"
+    "reports": "Reports", "recurring": "Recurring", "accounts": "Accounts",
+    "categories": "Categories"
   },
   "login": {
     "tagline": "Family finance control",
@@ -86,6 +87,28 @@
   },
   "person": { "shared": "Shared" },
   "lang": { "label": "Language" },
+  "cat": {
+    "title": "Categories",
+    "subtitle": "{{total}} categories",
+    "addBtn": "Add category",
+    "loading": "Loading…",
+    "empty": "No categories yet. Click «Add category» to get started.",
+    "modal": {
+      "titleNew": "New category",
+      "titleEdit": "Edit category",
+      "name": "Name",
+      "namePlaceholder": "e.g. Groceries",
+      "color": "Color",
+      "customColor": "Custom:",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Add category",
+      "saveEdit": "Save changes",
+      "delete": "Delete",
+      "confirmDelete": "Confirm delete",
+      "required": "Name is required."
+    }
+  },
   "acct": {
     "title": "Accounts",
     "subtitle": "{{total}} accounts",

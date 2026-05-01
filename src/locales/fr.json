@@ -4,7 +4,8 @@
     "principal": "Principal", "tools": "Outils",
     "dashboard": "Tableau de bord", "expenses": "Dépenses", "income": "Revenus",
     "budgets": "Budgets", "calendar": "Calendrier", "review": "À réviser",
-    "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes"
+    "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes",
+    "categories": "Catégories"
   },
   "login": {
     "tagline": "Gestion financière familiale",
@@ -86,6 +87,28 @@
   },
   "person": { "shared": "Partagé" },
   "lang": { "label": "Langue" },
+  "cat": {
+    "title": "Catégories",
+    "subtitle": "{{total}} catégories",
+    "addBtn": "Ajouter une catégorie",
+    "loading": "Chargement…",
+    "empty": "Aucune catégorie. Cliquez sur «Ajouter une catégorie» pour commencer.",
+    "modal": {
+      "titleNew": "Nouvelle catégorie",
+      "titleEdit": "Modifier la catégorie",
+      "name": "Nom",
+      "namePlaceholder": "ex. Épicerie",
+      "color": "Couleur",
+      "customColor": "Personnalisé :",
+      "cancel": "Annuler",
+      "saving": "Enregistrement…",
+      "save": "Ajouter la catégorie",
+      "saveEdit": "Enregistrer les modifications",
+      "delete": "Supprimer",
+      "confirmDelete": "Confirmer la suppression",
+      "required": "Le nom est obligatoire."
+    }
+  },
   "acct": {
     "title": "Comptes",
     "subtitle": "{{total}} comptes",
