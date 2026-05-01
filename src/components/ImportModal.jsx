@@ -5,6 +5,7 @@ import Modal from './Modal'
 import Icon from './Icon'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
+import { supabase } from '../lib/supabase'
 
 function serialToISO(serial) {
   return new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString().slice(0, 10)
@@ -185,6 +186,8 @@ export default function ImportModal({ onClose, onSave }) {
   const [defaultPerson, setDefaultPerson] = useState('Alexander')
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState(null)
+  const [dupCount, setDupCount]     = useState(0)
+  const [skipDups, setSkipDups]     = useState(true)
   const fileRef = useRef()
 
   const cadAccounts = accounts.filter(a => a.currency === 'CAD')
@@ -213,13 +216,42 @@ export default function ImportModal({ onClose, onSave }) {
     reader.readAsArrayBuffer(f)
   }, [accounts, categories]) // eslint-disable-line
 
-  function applySheet(workbook, sheetName) {
+  async function applySheet(workbook, sheetName) {
     const result = parseSheet(workbook.Sheets[sheetName], categories, accounts)
     setSelectedSheet(sheetName)
-    setRows(result.rows)
-    setPreview(result.rows.slice(0, 15))
     setStats({ total: result.rows.length, ...result })
     setStep('preview')
+
+    // Duplicate detection: query existing transactions for the same date range
+    const dates = result.rows.map(r => r.occurred_at.slice(0, 10)).filter(Boolean)
+    let taggedRows = result.rows
+    if (dates.length > 0) {
+      const minDate = dates.reduce((a, b) => a < b ? a : b)
+      const maxDate = dates.reduce((a, b) => a > b ? a : b)
+      const { data: existing } = await supabase
+        .from('transactions')
+        .select('occurred_at, amount, description')
+        .gte('occurred_at', minDate)
+        .lte('occurred_at', maxDate + 'T23:59:59')
+      const existingSet = new Set(
+        (existing || []).map(t =>
+          `${t.occurred_at.slice(0,10)}|${t.amount}|${t.description?.toLowerCase()}`
+        )
+      )
+      taggedRows = result.rows.map(r => ({
+        ...r,
+        _isDup: existingSet.has(
+          `${r.occurred_at.slice(0,10)}|${r.amount}|${r.description?.toLowerCase()}`
+        ),
+      }))
+      const dups = taggedRows.filter(r => r._isDup).length
+      setDupCount(dups)
+      setSkipDups(dups > 0)
+    } else {
+      setDupCount(0)
+    }
+    setRows(taggedRows)
+    setPreview(taggedRows.slice(0, 15))
   }
 
   function handleSheetConfirm() {
@@ -236,17 +268,17 @@ export default function ImportModal({ onClose, onSave }) {
     if (!rows?.length) return
     setSaving(true); setError(null)
     try {
-      // Auto-create any categories that didn't match existing ones
+      const activeRows = skipDups ? rows.filter(r => !r._isDup) : rows
+      if (!activeRows.length) { setError('All rows are duplicates — nothing to import.'); setSaving(false); return }
+
       const unmatchedNames = [...new Set(
-        rows.filter(r => r._cat_warn && r.category_name).map(r => r.category_name)
+        activeRows.filter(r => r._cat_warn && r.category_name).map(r => r.category_name)
       )]
       let catMap = {}
-      if (unmatchedNames.length > 0) {
-        catMap = await ensureCategories(unmatchedNames)
-      }
+      if (unmatchedNames.length > 0) catMap = await ensureCategories(unmatchedNames)
 
       const VALID_PERSONS = new Set(['Alexander', 'Marcela', 'Shared'])
-      const toInsert = rows.map(({ _cat_warn, _resolved_acct_id, category_name, account_name, ...r }) => ({
+      const toInsert = activeRows.map(({ _cat_warn, _isDup, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
         category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
         account_id:  _resolved_acct_id || defaultAcct || null,
@@ -265,6 +297,7 @@ export default function ImportModal({ onClose, onSave }) {
     setStep('upload'); setWb(null); setRows(null); setPreview(null)
     setStats(null); setError(null); setSheetNames([]); setSelectedSheet('')
     setDefaultAcct(''); setDefaultPerson('Alexander')
+    setDupCount(0); setSkipDups(true)
   }
 
   return (
@@ -359,6 +392,26 @@ export default function ImportModal({ onClose, onSave }) {
               )}
             </div>
 
+            {/* Duplicate warning */}
+            {dupCount > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.4)',
+                borderRadius: 8, marginBottom: 14,
+              }}>
+                <Icon name="review" size={14} style={{ color: 'var(--warn)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, color: 'var(--ink-1)', flex: 1 }}>
+                  <strong style={{ color: 'var(--warn)' }}>{dupCount} duplicate{dupCount > 1 ? 's' : ''}</strong>
+                  {' '}found — these rows already exist in your data.
+                </span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input type="checkbox" checked={skipDups} onChange={e => setSkipDups(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
+                  Skip duplicates
+                </label>
+              </div>
+            )}
+
             <div className="form-grid" style={{ marginBottom: 14 }}>
               <div className="form-field">
                 <label>{t('import.defaultAccount')} {!stats.isSheet1 && t('import.defaultAccountNote')}</label>
@@ -446,7 +499,7 @@ export default function ImportModal({ onClose, onSave }) {
         )}
         {step === 'preview' && stats?.total > 0 && (
           <button type="button" className="btn primary" onClick={handleImport} disabled={saving}>
-            {saving ? t('import.importing') : t('import.importBtn', { count: rows.length })}
+            {saving ? t('import.importing') : t('import.importBtn', { count: skipDups ? (rows?.length ?? 0) - dupCount : rows?.length ?? 0 })}
             {!defaultAcct && !saving && (
               <span style={{ fontSize: 10, opacity: 0.75, display: 'block', lineHeight: 1 }}>
                 {t('import.noAccountNote')}
