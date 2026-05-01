@@ -5,6 +5,7 @@ import Dashboard from '../screens/Dashboard'
 import Transactions from '../screens/Transactions'
 import Budgets from '../screens/Budgets'
 import Reconciliation from '../screens/Reconciliation'
+import ReportsScreen from '../screens/Reports'
 import RecurringScreen from '../screens/Recurring'
 import CalendarScreen from '../screens/Calendar'
 import ReviewShared from '../screens/Review'
@@ -42,7 +43,7 @@ export default function Shell() {
             <Route path="/budgets"    element={<Budgets />} />
             <Route path="/calendar"   element={<CalendarScreen />} />
             <Route path="/review"     element={<ReviewShared />} />
-            <Route path="/reports"    element={<Reconciliation />} />
+            <Route path="/reports"    element={<ReportsScreen />} />
             <Route path="/recurring"  element={<RecurringScreen />} />
             <Route path="/accounts"    element={<AccountsScreen />} />
             <Route path="/categories"  element={<CategoriesScreen />} />
