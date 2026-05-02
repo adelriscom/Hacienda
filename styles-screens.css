@@ -345,9 +345,9 @@
   grid-template-columns: 7fr 3fr;
   gap: 12px;
 }
-.cal-grid > * { min-width: 0; }
+.cal-grid > * { min-width: 0; min-height: 0; }
 .cal-main { padding: 18px; }
-.cal-sidebar { overflow-y: auto; max-height: 680px; }
+.cal-sidebar { overflow-y: auto; }
 .cal-list { display: flex; flex-direction: column; gap: 10px; }
 .cal-list-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .cal-list-row:last-child { border-bottom: none; }
