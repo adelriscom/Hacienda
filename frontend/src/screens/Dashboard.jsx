@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const [loading, setLoading]       = useState(true)
   const { isFamily, myUserId }      = useHousehold()
   const didAutoJump = useRef(false)
+  const navigate    = useNavigate()
 
   useEffect(() => {
     async function load() {
@@ -184,15 +186,23 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="hero-right">
-          <div className="hero-pill">
+          <div className="hero-pill hero-pill-link"
+            role="button" tabIndex={0}
+            onClick={() => navigate('/income', { state: { month: focusMonth } })}
+            onKeyDown={e => e.key === 'Enter' && navigate('/income', { state: { month: focusMonth } })}>
             <div className="hero-pill-h"><Icon name="income" size={13} style={{ color: 'var(--pos)' }} /><span>Income</span></div>
-            <div className="num num-lg">{fmtK(stats.income)}</div>
-            <div className="hero-pill-sub">{fmtMonthLong(focusMonth)}</div>
+            <div className="num num-lg" style={{ color: 'var(--pos)' }}>{fmtK(stats.income)}</div>
+            <div className="hero-pill-sub">{fmt(stats.income)} total</div>
+            <Icon name="chevron-right" size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-4)' }} />
           </div>
-          <div className="hero-pill">
+          <div className="hero-pill hero-pill-link"
+            role="button" tabIndex={0}
+            onClick={() => navigate('/expenses', { state: { month: focusMonth } })}
+            onKeyDown={e => e.key === 'Enter' && navigate('/expenses', { state: { month: focusMonth } })}>
             <div className="hero-pill-h"><Icon name="expense" size={13} style={{ color: 'var(--neg)' }} /><span>Expenses</span></div>
-            <div className="num num-lg">{fmtK(stats.expenses)}</div>
-            <div className="hero-pill-sub">{fmtMonthLong(focusMonth)}</div>
+            <div className="num num-lg" style={{ color: 'var(--neg)' }}>{fmtK(stats.expenses)}</div>
+            <div className="hero-pill-sub">{fmt(stats.expenses)} total</div>
+            <Icon name="chevron-right" size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-4)' }} />
           </div>
         </div>
       </div>

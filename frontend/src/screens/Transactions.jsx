@@ -55,6 +55,16 @@ export default function Transactions({ type }) {
   const location        = useLocation()
   const handledTxId     = useRef(null)
 
+  // Apply month passed via navigate state (e.g. from dashboard cards)
+  useEffect(() => {
+    const { month } = location.state || {}
+    if (month && !location.state?.openTxId) {
+      setFilterMonth(month)
+      window.history.replaceState({}, '')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
   useEffect(() => { setActivePerson('all') }, [isFamily])
   useEffect(() => { setSelectedIds(new Set()) }, [filterMonth, activeFilter, activePerson, filterCat, filterAcct, filterDesc])

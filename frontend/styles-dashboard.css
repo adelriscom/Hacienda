@@ -90,6 +90,17 @@
 }
 .hero-pill-sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 .hero-pill svg { position: absolute; right: 12px; bottom: 12px; opacity: 0.7; }
+.hero-pill-link {
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .15s;
+  user-select: none;
+}
+.hero-pill-link:hover {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.hero-pill-link:active { transform: translateY(0); }
 
 /* KPI grid */
 .kpi-grid {
