@@ -42,8 +42,8 @@ INSERT INTO accounts (user_id, name, type, currency, balance, credit_limit) VALU
   (v_uid, 'RBC TC',                'credit',     'CAD', -6500.00,  6500.00),
   (v_uid, 'CIBC COSTCO',           'credit',     'CAD',     0.00,  5000.00),
   -- Other
-  (v_uid, 'CSB Savings',           'savings',    'CAD',     0.00,    NULL),
-  (v_uid, 'CSB Checking',          'checking',   'CAD',     0.00,    NULL),
+  (v_uid, 'CIBC Savings',           'savings',    'CAD',     0.00,    NULL),
+  (v_uid, 'CIBC Chequing',          'checking',   'CAD',     0.00,    NULL),
   (v_uid, 'Propulsar Alexander',   'investment', 'CAD',   150.00,    NULL),
   (v_uid, 'Cash CAD',              'cash',       'CAD',     0.00,    NULL)
 ON CONFLICT DO NOTHING;
