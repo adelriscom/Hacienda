@@ -318,7 +318,7 @@ export default function Transactions({ type }) {
           <select value={bulkVals.status} onChange={e => setBulk('status', e.target.value)}
             style={{ ...selStyle(!!bulkVals.status), height: 30, fontSize: 12 }}>
             <option value="">Status…</option>
-            <option value="match">Reconciled</option>
+            <option value="match">Cleared</option>
             <option value="review">To review</option>
             <option value="ghost">Ghost</option>
             <option value="duplicate">Duplicate</option>
