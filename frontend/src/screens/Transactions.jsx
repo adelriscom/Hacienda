@@ -47,6 +47,7 @@ export default function Transactions({ type }) {
   const [filterMonth, setFilterMonth]   = useState(nowMonth)
   const [filterCat, setFilterCat]       = useState('')
   const [filterAcct, setFilterAcct]     = useState('')
+  const [filterDesc, setFilterDesc]     = useState('')
   const [selectedIds, setSelectedIds]   = useState(new Set())
   const [bulkVals, setBulkVals]         = useState({ account_id: '', category_id: '', person: '', status: '' })
   const [applying, setApplying]         = useState(false)
@@ -55,7 +56,7 @@ export default function Transactions({ type }) {
 
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
   useEffect(() => { setActivePerson('all') }, [isFamily])
-  useEffect(() => { setSelectedIds(new Set()) }, [filterMonth, activeFilter, activePerson, filterCat, filterAcct])
+  useEffect(() => { setSelectedIds(new Set()) }, [filterMonth, activeFilter, activePerson, filterCat, filterAcct, filterDesc])
 
   // Handle navigation from global search
   useEffect(() => {
@@ -104,6 +105,7 @@ export default function Transactions({ type }) {
     .filter(tx => activePerson === 'all' || tx.person === activePerson)
     .filter(tx => !filterCat  || tx.category_id === filterCat)
     .filter(tx => !filterAcct || tx.account_id  === filterAcct)
+    .filter(tx => !filterDesc || tx.description.toLowerCase().includes(filterDesc.toLowerCase()))
 
   const ghost   = filtered.filter(tx => tx.status === 'ghost').length
   const review  = filtered.filter(tx => tx.status === 'review').length
@@ -204,6 +206,26 @@ export default function Transactions({ type }) {
           ))}
         </div>
         <div className="filter-spacer" />
+
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input
+            value={filterDesc}
+            onChange={e => setFilterDesc(e.target.value)}
+            placeholder="Description…"
+            style={{
+              ...selStyle(!!filterDesc),
+              paddingLeft: 10, paddingRight: filterDesc ? 24 : 10,
+              height: 30, borderRadius: 6, fontSize: 12.5,
+              width: 160,
+            }}
+          />
+          {filterDesc && (
+            <button onClick={() => setFilterDesc('')} style={{
+              position: 'absolute', right: 6, background: 'none', border: 'none',
+              cursor: 'pointer', color: 'var(--ink-3)', padding: 0, lineHeight: 1,
+            }}>✕</button>
+          )}
+        </div>
 
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selStyle(!!filterCat)}>
           <option value="">{t('transactions.filterBtns.category')}</option>
