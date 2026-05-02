@@ -174,23 +174,23 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
               </select>
             </div>
 
-            {isEdit ? (
+            {isEdit && (
               <div className="form-field">
                 <label>{t('newTx.status')}</label>
                 <select value={form.status} onChange={e => set('status', e.target.value)}>
                   {statuses.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
-            ) : (
-              <div className="form-field" style={{ justifyContent: 'flex-end' }}>
-                <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.is_recurring}
-                    onChange={e => set('is_recurring', e.target.checked)}
-                    style={{ width: 'auto', height: 'auto' }} />
-                  {t('newTx.recurring')}
-                </label>
-              </div>
             )}
+
+            <div className="form-field" style={{ justifyContent: 'flex-end' }}>
+              <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={form.is_recurring}
+                  onChange={e => set('is_recurring', e.target.checked)}
+                  style={{ width: 'auto', height: 'auto' }} />
+                {t('newTx.recurring')}
+              </label>
+            </div>
 
             <div className="form-field span-2">
               <label>{t('newTx.notes')}</label>
