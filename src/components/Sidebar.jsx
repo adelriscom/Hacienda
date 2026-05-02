@@ -19,17 +19,11 @@ function useTheme() {
   return { theme, setTheme }
 }
 
-const LANGS = [
-  { code: 'en', label: 'EN' },
-  { code: 'es', label: 'ES' },
-  { code: 'fr', label: 'FR' },
-]
-
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { session } = useAuth()
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
 
   const email    = session?.user?.email ?? ''
@@ -125,22 +119,6 @@ export default function Sidebar() {
           </div>
         </div>
       )}
-
-      {/* Language row */}
-      <div style={{ display: 'flex', gap: 4, padding: '0 10px 5px' }}>
-        {LANGS.map(({ code, label }) => (
-          <button key={code} onClick={() => i18n.changeLanguage(code)}
-            style={{
-              flex: 1, height: 26, borderRadius: 6, border: '1px solid',
-              borderColor: i18n.language === code ? 'var(--accent)' : 'var(--line-strong)',
-              background: i18n.language === code ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : 'transparent',
-              color: i18n.language === code ? 'var(--accent)' : 'var(--ink-3)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            }}>
-            {label}
-          </button>
-        ))}
-      </div>
 
       {/* Theme row */}
       <div style={{ display: 'flex', gap: 4, padding: '0 10px 10px' }}>

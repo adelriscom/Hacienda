@@ -5,6 +5,12 @@ import Icon from './Icon'
 import { useSearch } from '../hooks/useSearch'
 import { useNotifications } from '../hooks/useNotifications'
 
+const LANGS = [
+  { code: 'en', label: 'English',  flag: '🇨🇦' },
+  { code: 'es', label: 'Español',  flag: '🇨🇴' },
+  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+]
+
 const fmtDate = s => new Date(s).toLocaleDateString('en-CA', { day: 'numeric', month: 'short', year: 'numeric' })
 const fmtAmt  = n => (n > 0 ? '+' : '−') + '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -16,7 +22,10 @@ export default function Topbar({ greet, date, action, onAction, children }) {
 
   const searchRef = useRef(null)
   const bellRef   = useRef(null)
+  const langRef   = useRef(null)
   const [bellOpen, setBellOpen] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
+  const currentLang = LANGS.find(l => l.code === i18n.language) || LANGS[0]
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -31,6 +40,7 @@ export default function Topbar({ greet, date, action, onAction, children }) {
   useEffect(() => {
     function handler(e) {
       if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false)
+      if (langRef.current && !langRef.current.contains(e.target)) setLangOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -43,7 +53,7 @@ export default function Topbar({ greet, date, action, onAction, children }) {
   }
 
   function handleKey(e) {
-    if (e.key === 'Escape') { clear(); setBellOpen(false) }
+    if (e.key === 'Escape') { clear(); setBellOpen(false); setLangOpen(false) }
   }
 
   const SEVERITY_COLOR = { neg: 'var(--neg)', warn: 'var(--warn)', pos: 'var(--pos)' }
@@ -238,6 +248,49 @@ export default function Topbar({ greet, date, action, onAction, children }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Language switcher */}
+      <div ref={langRef} style={{ position: 'relative' }}>
+        <button className="icon-btn" onClick={() => setLangOpen(v => !v)}
+          title="Language"
+          style={{ background: langOpen ? 'var(--bg-3)' : undefined, width: 36, height: 36 }}>
+          <Icon name="globe" size={15} />
+        </button>
+
+        {langOpen && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+            width: 170, background: 'var(--bg-card)',
+            border: '1px solid var(--line)', borderRadius: 'var(--r-md)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            zIndex: 300, overflow: 'hidden',
+            padding: '4px',
+          }}>
+            {LANGS.map(lang => {
+              const active = i18n.language === lang.code
+              return (
+                <button key={lang.code}
+                  onClick={() => { i18n.changeLanguage(lang.code); setLangOpen(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 10px', borderRadius: 6,
+                    background: active ? 'color-mix(in oklab, var(--accent) 12%, transparent)' : 'transparent',
+                    border: 'none', cursor: 'pointer', textAlign: 'left',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-2)' }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+                >
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>{lang.flag}</span>
+                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--ink-1)', flex: 1 }}>
+                    {lang.label}
+                  </span>
+                  {active && <Icon name="check" size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
