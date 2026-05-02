@@ -1,32 +1,87 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 
+function nowMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function fmtMonthLong(ym) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })
+}
+
+function fmtMonthShort(ym) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'short' })
+}
+
 export default function Dashboard() {
-  const [stats, setStats] = useState(null)
-  const { isFamily, myUserId } = useHousehold()
+  const [focusMonth, setFocusMonth] = useState(nowMonth)
+  const [stats, setStats]           = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const { isFamily, myUserId }      = useHousehold()
+  const didAutoJump = useRef(false)
 
   useEffect(() => {
     async function load() {
-      const now   = new Date()
-      const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+      setLoading(true)
+      setStats(null)
+
+      // Load 6 months ending at focusMonth
+      const oldest  = shiftMonth(focusMonth, -5)
+      const [oy, om] = oldest.split('-').map(Number)
+      const [fy, fm] = focusMonth.split('-').map(Number)
+      const start = new Date(oy, om - 1, 1).toISOString()
+      const end   = new Date(fy, fm, 1).toISOString()
 
       let query = supabase
         .from('transactions')
-        .select('amount, type, occurred_at, category_id, account_id, category:categories(name, color)')
-        .gte('occurred_at', start.toISOString())
+        .select('amount, type, occurred_at, category_id, category:categories(name, color)')
+        .gte('occurred_at', start)
+        .lt('occurred_at', end)
         .order('occurred_at', { ascending: true })
       if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
       const { data: txs } = await query
 
-      if (!txs?.length) { setStats({}); return }
+      // Auto-jump: on first load if focusMonth is empty, jump to last month with data
+      if (!didAutoJump.current) {
+        didAutoJump.current = true
+        const curStart = new Date(fy, fm - 1, 1).toISOString()
+        const curEnd   = new Date(fy, fm, 1).toISOString()
+        const curTxs   = (txs || []).filter(t => t.occurred_at >= curStart && t.occurred_at < curEnd)
+        if (curTxs.length === 0 && txs?.length > 0) {
+          // Find the latest month in the 6-month window that has data
+          for (let i = -1; i >= -5; i--) {
+            const ym = shiftMonth(focusMonth, i)
+            const [my, mm] = ym.split('-').map(Number)
+            const ms = new Date(my, mm - 1, 1).toISOString()
+            const me = new Date(my, mm, 1).toISOString()
+            if (txs.some(t => t.occurred_at >= ms && t.occurred_at < me)) {
+              setFocusMonth(ym)
+              setLoading(false)
+              return // will re-run with new focusMonth
+            }
+          }
+        }
+      }
 
-      const curStart  = new Date(now.getFullYear(), now.getMonth(),     1).toISOString()
-      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+      if (!txs?.length) { setStats({}); setLoading(false); return }
 
-      const cur  = txs.filter(t => t.occurred_at >= curStart)
+      const curStart  = new Date(fy, fm - 1, 1).toISOString()
+      const curEnd    = new Date(fy, fm, 1).toISOString()
+      const prevStart = new Date(fy, fm - 2, 1).toISOString()
+
+      const cur  = txs.filter(t => t.occurred_at >= curStart && t.occurred_at < curEnd)
       const prev = txs.filter(t => t.occurred_at >= prevStart && t.occurred_at < curStart)
 
       const income   = cur.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
@@ -34,26 +89,25 @@ export default function Dashboard() {
       const prevExp  = prev.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
       const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
-      // Category breakdown for current month
       const catMap = {}
       cur.filter(t => t.amount < 0 && t.category).forEach(t => {
         const k = t.category.name
         if (!catMap[k]) catMap[k] = { name: k, color: t.category.color || '#94a3b8', amount: 0 }
         catMap[k].amount += Math.abs(t.amount)
       })
-      const topCats = Object.values(catMap).sort((a, b) => b.amount - a.amount).slice(0, 6)
-      const totalCat = topCats.reduce((s, c) => s + c.amount, 0)
+      const topCats    = Object.values(catMap).sort((a, b) => b.amount - a.amount).slice(0, 6)
+      const totalCat   = topCats.reduce((s, c) => s + c.amount, 0)
       const categories = topCats.map(c => ({ ...c, pct: totalCat ? Math.round(c.amount / totalCat * 100) : 0 }))
 
-      // Monthly cash flow (last 6 months)
       const months = []
       for (let i = 5; i >= 0; i--) {
-        const s = new Date(now.getFullYear(), now.getMonth() - i,     1).toISOString()
-        const e = new Date(now.getFullYear(), now.getMonth() - i + 1, 1).toISOString()
-        const label = new Date(now.getFullYear(), now.getMonth() - i).toLocaleDateString('en-CA', { month: 'short' })
-        const mTxs = txs.filter(t => t.occurred_at >= s && t.occurred_at < e)
+        const ym = shiftMonth(focusMonth, -i)
+        const [my, mm] = ym.split('-').map(Number)
+        const ms = new Date(my, mm - 1, 1).toISOString()
+        const me = new Date(my, mm, 1).toISOString()
+        const mTxs = txs.filter(t => t.occurred_at >= ms && t.occurred_at < me)
         months.push({
-          label,
+          label:    fmtMonthShort(ym),
           income:   mTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
           expenses: mTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
           current:  i === 0,
@@ -61,25 +115,40 @@ export default function Dashboard() {
       }
 
       setStats({ income, expenses, expDelta, categories, months, txCount: cur.length })
+      setLoading(false)
     }
     load()
-  }, [isFamily, myUserId])
+  }, [focusMonth, isFamily, myUserId])
 
   const fmt  = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)
   const today = new Date().toLocaleDateString('en-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  if (!stats) return (
+  const nav = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <button className="btn ghost sm" style={{ padding: '0 8px' }}
+        onClick={() => { didAutoJump.current = true; setFocusMonth(m => shiftMonth(m, -1)) }}>←</button>
+      <span style={{ fontSize: 12, color: 'var(--ink-2)', padding: '0 6px', minWidth: 110, textAlign: 'center' }}>
+        {fmtMonthLong(focusMonth)}
+      </span>
+      <button className="btn ghost sm" style={{ padding: '0 8px' }}
+        onClick={() => { didAutoJump.current = true; setFocusMonth(m => shiftMonth(m, 1)) }}>→</button>
+    </div>
+  )
+
+  if (loading) return (
     <>
-      <Topbar greet="Dashboard" date={today} />
+      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
       <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>Loading…</div>
     </>
   )
 
-  if (!stats.income && !stats.expenses) return (
+  if (!stats?.income && !stats?.expenses) return (
     <>
-      <Topbar greet="Dashboard" date={today} />
-      <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>No data for the current period.</div>
+      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
+      <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>
+        No data for {fmtMonthLong(focusMonth)}.
+      </div>
     </>
   )
 
@@ -88,11 +157,11 @@ export default function Dashboard() {
 
   return (
     <>
-      <Topbar greet="Dashboard" date={today} />
+      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
 
       <div className="card hero-balance">
         <div className="hero-left">
-          <div className="card-title">This month</div>
+          <div className="card-title">{fmtMonthLong(focusMonth)}</div>
           <div className="num num-hero" style={{ color: savings < 0 ? 'var(--neg)' : undefined }}>
             {savings < 0 ? '−' : ''}{fmt(Math.abs(savings))}
           </div>
@@ -118,29 +187,29 @@ export default function Dashboard() {
           <div className="hero-pill">
             <div className="hero-pill-h"><Icon name="income" size={13} style={{ color: 'var(--pos)' }} /><span>Income</span></div>
             <div className="num num-lg">{fmtK(stats.income)}</div>
-            <div className="hero-pill-sub">This month</div>
+            <div className="hero-pill-sub">{fmtMonthLong(focusMonth)}</div>
           </div>
           <div className="hero-pill">
             <div className="hero-pill-h"><Icon name="expense" size={13} style={{ color: 'var(--neg)' }} /><span>Expenses</span></div>
             <div className="num num-lg">{fmtK(stats.expenses)}</div>
-            <div className="hero-pill-sub">This month</div>
+            <div className="hero-pill-sub">{fmtMonthLong(focusMonth)}</div>
           </div>
         </div>
       </div>
 
       <div className="kpi-grid">
         <KPI icon="piggy"    tint="var(--accent-2)"
-          label="Net savings"     value={fmtK(Math.abs(savings))}
-          delta={savings >= 0 ? 'Positive' : 'Negative'}   tone={savings >= 0 ? 'pos' : 'neg'} />
+          label="Net savings"    value={fmtK(Math.abs(savings))}
+          delta={savings >= 0 ? 'Positive' : 'Negative'} tone={savings >= 0 ? 'pos' : 'neg'} />
         <KPI icon="wallet"   tint="var(--pos)"
-          label="Transactions"    value={String(stats.txCount)}
-          delta="this month"                                  tone="pos" />
+          label="Transactions"   value={String(stats.txCount)}
+          delta={fmtMonthLong(focusMonth)} tone="pos" />
         <KPI icon="filter"   tint="var(--accent-3)"
-          label="Top category"    value={stats.categories[0]?.name || '—'}
-          delta={stats.categories[0] ? fmtK(stats.categories[0].amount) : ''}  tone="warn" />
+          label="Top category"   value={stats.categories[0]?.name || '—'}
+          delta={stats.categories[0] ? fmtK(stats.categories[0].amount) : ''} tone="warn" />
         <KPI icon="trend-up" tint="var(--warn)"
-          label="Expense change"  value={stats.expDelta != null ? `${Number(stats.expDelta) > 0 ? '+' : ''}${stats.expDelta}%` : '—'}
-          delta="vs last month"   tone={Number(stats.expDelta) <= 0 ? 'pos' : 'warn'} />
+          label="Expense change" value={stats.expDelta != null ? `${Number(stats.expDelta) > 0 ? '+' : ''}${stats.expDelta}%` : '—'}
+          delta="vs last month"  tone={Number(stats.expDelta) <= 0 ? 'pos' : 'warn'} />
       </div>
 
       <div className="grid-2">
@@ -167,7 +236,7 @@ export default function Dashboard() {
 
         <div className="card">
           <div className="card-h">
-            <div><h3>Expenses by Category</h3><p>Distribution this month</p></div>
+            <div><h3>Expenses by Category</h3><p>Distribution · {fmtMonthLong(focusMonth)}</p></div>
           </div>
           {stats.categories.length > 0 ? (
             <>
@@ -185,7 +254,7 @@ export default function Dashboard() {
             </>
           ) : (
             <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-              No expense data this month
+              No expense data for {fmtMonthLong(focusMonth)}
             </div>
           )}
         </div>
