@@ -513,10 +513,17 @@
   .hamburger { display: flex; flex-shrink: 0; }
 
   /* Topbar */
-  .topbar { gap: 8px; margin-bottom: 16px; }
-  .greet h1 { font-size: 18px; }
-  .greet p  { display: none; }
-  .search   { display: none; }
+  .topbar        { gap: 6px; margin-bottom: 16px; }
+  .greet h1      { font-size: 18px; }
+  .greet p       { display: none; }
+  .search        { display: none; }
+  .topbar-lang   { display: none; }
+  .icon-btn      { width: 32px; height: 32px; }
+  .btn.ghost.sm,
+  .btn.primary.sm { padding: 0 10px; font-size: 11.5px; height: 30px; }
+
+  /* Month nav label — override inline minWidth */
+  .topbar span[style*="minWidth"] { min-width: auto !important; font-size: 11px !important; }
 
   /* Main content padding */
   .main { padding: 14px 14px 24px; }

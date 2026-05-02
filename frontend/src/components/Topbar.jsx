@@ -259,8 +259,8 @@ export default function Topbar({ greet, date, action, onAction, children }) {
         )}
       </div>
 
-      {/* Language switcher */}
-      <div ref={langRef} style={{ position: 'relative' }}>
+      {/* Language switcher — hidden on mobile */}
+      <div ref={langRef} style={{ position: 'relative' }} className="topbar-lang">
         <button className="icon-btn" onClick={() => setLangOpen(v => !v)}
           title="Language"
           style={{ background: langOpen ? 'var(--bg-3)' : undefined, width: 36, height: 36 }}>
