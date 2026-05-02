@@ -245,6 +245,8 @@
       "currency": "Currency",
       "balance": "Current balance",
       "creditLimit": "Credit limit",
+      "interestRate": "Annual Interest Rate (% APR)",
+      "interestRatePlaceholder": "e.g. 19.99",
       "active": "Active account",
       "cancel": "Cancel",
       "saving": "Saving…",

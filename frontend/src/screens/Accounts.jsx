@@ -38,6 +38,19 @@ export default function Accounts() {
   const fmtCAD = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const fmtCOP = n => '$ ' + Math.round(n).toLocaleString('es-CO')
 
+  const { cadInterestCost, cadInterestReturn, copInterestCost, copInterestReturn } = activeAccounts.reduce((acc, a) => {
+    if (!a.interest_rate || a.interest_rate <= 0) return acc
+    const rate = a.interest_rate / 100 / 12
+    if (a.type === 'credit' && (a.balance || 0) < 0) {
+      if (a.currency === 'CAD') acc.cadInterestCost += Math.abs(a.balance) * rate
+      else acc.copInterestCost += Math.abs(a.balance) * rate
+    } else if ((a.type === 'savings' || a.type === 'investment') && (a.balance || 0) > 0) {
+      if (a.currency === 'CAD') acc.cadInterestReturn += a.balance * rate
+      else acc.copInterestReturn += a.balance * rate
+    }
+    return acc
+  }, { cadInterestCost: 0, cadInterestReturn: 0, copInterestCost: 0, copInterestReturn: 0 })
+
   return (
     <>
       <Topbar greet={t('acct.title')} date={t('acct.subtitle', { total: accounts.length })}>
@@ -65,6 +78,18 @@ export default function Accounts() {
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
                 {cadAccounts.length} active account{cadAccounts.length !== 1 ? 's' : ''}
               </div>
+              {cadInterestCost > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Est. interest cost:</span>
+                  <span className="num" style={{ fontWeight: 600 }}>{fmtCAD(cadInterestCost)}/mo</span>
+                </div>
+              )}
+              {cadInterestReturn > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--pos)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Est. return:</span>
+                  <span className="num" style={{ fontWeight: 600 }}>{fmtCAD(cadInterestReturn)}/mo</span>
+                </div>
+              )}
             </div>
           )}
           {copAccounts.length > 0 && (
@@ -78,6 +103,18 @@ export default function Accounts() {
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
                 {copAccounts.length} active account{copAccounts.length !== 1 ? 's' : ''}
               </div>
+              {copInterestCost > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--warn)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Est. interest cost:</span>
+                  <span className="num" style={{ fontWeight: 600 }}>{fmtCOP(copInterestCost)}/mo</span>
+                </div>
+              )}
+              {copInterestReturn > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--pos)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>Est. return:</span>
+                  <span className="num" style={{ fontWeight: 600 }}>{fmtCOP(copInterestReturn)}/mo</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -167,7 +204,7 @@ function AccountCard({ account: a, onEdit, onToggle, t }) {
         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {a.name}
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{
             fontSize: 10.5, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
             background: `${color}22`, color,
@@ -182,7 +219,41 @@ function AccountCard({ account: a, onEdit, onToggle, t }) {
               {t('acct.inactive')}
             </span>
           )}
+          {a.interest_rate > 0 && (
+            <span style={{
+              fontSize: 10.5, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+              background: a.type === 'credit' ? 'var(--warn-soft)' : 'var(--pos-soft)',
+              color: a.type === 'credit' ? 'var(--warn)' : 'var(--pos)',
+            }}>
+              {a.interest_rate}% APR
+            </span>
+          )}
         </div>
+        {a.interest_rate > 0 && (() => {
+          const rate = a.interest_rate / 100 / 12
+          const bal  = a.balance || 0
+          if (a.type === 'credit' && bal < 0) {
+            const est = Math.abs(bal) * rate
+            return (
+              <div style={{ fontSize: 10.5, color: 'var(--warn)', marginTop: 3 }}>
+                Est. {a.currency === 'CAD'
+                  ? '$' + est.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '$ ' + Math.round(est).toLocaleString('es-CO')}/mo interest
+              </div>
+            )
+          }
+          if ((a.type === 'savings' || a.type === 'investment') && bal > 0) {
+            const est = bal * rate
+            return (
+              <div style={{ fontSize: 10.5, color: 'var(--pos)', marginTop: 3 }}>
+                Est. {a.currency === 'CAD'
+                  ? '$' + est.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                  : '$ ' + Math.round(est).toLocaleString('es-CO')}/mo return
+              </div>
+            )
+          }
+          return null
+        })()}
       </div>
 
       {/* Actions */}
@@ -203,13 +274,13 @@ function AccountCard({ account: a, onEdit, onToggle, t }) {
   )
 }
 
-const EMPTY_FORM = { name: '', type: 'checking', currency: 'CAD', balance: '', credit_limit: '', is_active: true }
+const EMPTY_FORM = { name: '', type: 'checking', currency: 'CAD', balance: '', credit_limit: '', interest_rate: '', is_active: true }
 
 function AccountModal({ account, onClose, onSave, t }) {
   const [form, setForm] = useState(account
     ? { name: account.name, type: account.type, currency: account.currency,
         balance: account.balance ?? '', credit_limit: account.credit_limit ?? '',
-        is_active: account.is_active }
+        interest_rate: account.interest_rate ?? '', is_active: account.is_active }
     : EMPTY_FORM
   )
   const [saving, setSaving] = useState(false)
@@ -225,12 +296,15 @@ function AccountModal({ account, onClose, onSave, t }) {
     setSaving(true); setError(null)
     try {
       await onSave({
-        name:         form.name.trim(),
-        type:         form.type,
-        currency:     form.currency,
-        balance:      parseFloat(form.balance) || 0,
-        credit_limit: form.type === 'credit' && form.credit_limit ? parseFloat(form.credit_limit) : null,
-        is_active:    form.is_active,
+        name:          form.name.trim(),
+        type:          form.type,
+        currency:      form.currency,
+        balance:       parseFloat(form.balance) || 0,
+        credit_limit:  form.type === 'credit' && form.credit_limit ? parseFloat(form.credit_limit) : null,
+        interest_rate: ['credit', 'savings', 'investment'].includes(form.type) && form.interest_rate
+                         ? parseFloat(form.interest_rate)
+                         : 0,
+        is_active:     form.is_active,
       })
     } catch (err) {
       setError(err.message)
@@ -280,6 +354,15 @@ function AccountModal({ account, onClose, onSave, t }) {
                 <label>{t('acct.modal.creditLimit')}</label>
                 <input type="number" step="0.01" placeholder="0.00"
                   value={form.credit_limit} onChange={e => set('credit_limit', e.target.value)} />
+              </div>
+            )}
+
+            {['credit', 'savings', 'investment'].includes(form.type) && (
+              <div className="form-field">
+                <label>{t('acct.modal.interestRate')}</label>
+                <input type="number" step="0.01" min="0" max="100"
+                  placeholder={t('acct.modal.interestRatePlaceholder')}
+                  value={form.interest_rate} onChange={e => set('interest_rate', e.target.value)} />
               </div>
             )}
 
