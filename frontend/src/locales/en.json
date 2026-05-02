@@ -42,7 +42,8 @@
     },
     "tags": {
       "ghost": "Ghost charge", "review": "To review", "duplicate": "Duplicate",
-      "income": "Income", "transfer": "Transfer", "recurring": "Recurring"
+      "income": "Income", "transfer": "Transfer", "recurring": "Recurring",
+      "cleared": "Cleared", "pending": "Pending"
     }
   },
   "newTx": {

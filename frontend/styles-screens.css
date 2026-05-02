@@ -86,10 +86,11 @@
   color: var(--ink-1);
 }
 
-.tag-ghost { background: rgba(168, 85, 247, 0.16); color: var(--accent-2); }
-.tag-warn { background: var(--warn-soft); color: var(--warn); }
-.tag-ok { background: var(--pos-soft); color: var(--pos); }
-.tag-income { background: var(--pos-soft); color: var(--pos); }
+.tag-ghost   { background: rgba(168, 85, 247, 0.16); color: var(--accent-2); }
+.tag-warn    { background: var(--warn-soft); color: var(--warn); }
+.tag-ok      { background: var(--pos-soft); color: var(--pos); }
+.tag-income  { background: var(--pos-soft); color: var(--pos); }
+.tag-pending { background: var(--bg-3); color: var(--ink-4); border: 1px solid var(--border); }
 
 .icon-btn.sm-btn { width: 28px; height: 28px; background: transparent; border: none; }
 .icon-btn.sm-btn:hover { background: var(--bg-3); }
