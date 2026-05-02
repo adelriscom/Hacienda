@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
@@ -6,25 +5,14 @@ import { useAuth } from '../lib/auth'
 import { useHousehold } from '../lib/household'
 import Icon from './Icon'
 import { useSidebarCounts } from '../hooks/useSidebarCounts'
-
-function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    const stored = localStorage.getItem('hacienda_theme')
-    return (stored === 'dark' || stored === 'light') ? stored : 'dark'
-  })
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('hacienda_theme', theme)
-  }, [theme])
-  return { theme, setTheme }
-}
+import { useTheme } from '../hooks/useTheme'
 
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { session } = useAuth()
   const { t } = useTranslation()
-  const { theme, setTheme } = useTheme()
+  useTheme() // ensures theme is applied on initial render
 
   const email    = session?.user?.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
@@ -119,26 +107,6 @@ export default function Sidebar() {
           </div>
         </div>
       )}
-
-      {/* Theme row */}
-      <div style={{ display: 'flex', gap: 4, padding: '0 10px 10px' }}>
-        {[
-          { id: 'dark',  icon: '🌙', label: 'Dark' },
-          { id: 'light', icon: '☀️', label: 'Light' },
-        ].map(({ id, icon, label }) => (
-          <button key={id} onClick={() => setTheme(id)}
-            style={{
-              flex: 1, height: 26, borderRadius: 6, border: '1px solid',
-              borderColor: theme === id ? 'var(--accent)' : 'var(--line-strong)',
-              background: theme === id ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : 'transparent',
-              color: theme === id ? 'var(--accent)' : 'var(--ink-3)',
-              fontSize: 10, fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-            }}>
-            <span style={{ fontSize: 11 }}>{icon}</span>{label}
-          </button>
-        ))}
-      </div>
 
       <div className="sb-user">
         <div className="sb-user-card">

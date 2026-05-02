@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 import { useSearch } from '../hooks/useSearch'
 import { useNotifications } from '../hooks/useNotifications'
+import { useTheme } from '../hooks/useTheme'
 
 const LANGS = [
   { code: 'en', label: 'English',  flag: '🇨🇦' },
@@ -19,6 +20,7 @@ export default function Topbar({ greet, date, action, onAction, children }) {
   const navigate = useNavigate()
   const { query, setQuery, results, loading, open, setOpen, clear } = useSearch()
   const { items: notifs, count: notifCount } = useNotifications()
+  const { theme, toggle: toggleTheme } = useTheme()
 
   const searchRef = useRef(null)
   const bellRef   = useRef(null)
@@ -294,6 +296,15 @@ export default function Topbar({ greet, date, action, onAction, children }) {
           </div>
         )}
       </div>
+
+      {/* Theme toggle */}
+      <button
+        className="icon-btn"
+        onClick={toggleTheme}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
+      </button>
 
       {children}
       {action && (
