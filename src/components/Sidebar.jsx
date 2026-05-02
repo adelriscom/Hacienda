@@ -8,7 +8,10 @@ import Icon from './Icon'
 import { useSidebarCounts } from '../hooks/useSidebarCounts'
 
 function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('hacienda_theme') || 'dark')
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('hacienda_theme')
+    return (stored === 'dark' || stored === 'light') ? stored : 'dark'
+  })
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('hacienda_theme', theme)
@@ -142,7 +145,6 @@ export default function Sidebar() {
         {[
           { id: 'dark',  icon: '🌙', label: 'Dark' },
           { id: 'light', icon: '☀️', label: 'Light' },
-          { id: 'warm',  icon: '🔥', label: 'Warm' },
         ].map(({ id, icon, label }) => (
           <button key={id} onClick={() => setTheme(id)}
             style={{

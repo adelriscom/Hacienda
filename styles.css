@@ -68,33 +68,6 @@
 }
 [data-theme="light"] .app::before { opacity: 0.4; }
 
-/* Warm theme */
-[data-theme="warm"] {
-  --bg-0: #0e0b07;
-  --bg-1: #141008;
-  --bg-2: #1d1810;
-  --bg-3: #262014;
-  --bg-card: #17130a;
-  --bg-elev: #201a0f;
-  --line: rgba(255, 200, 100, 0.08);
-  --line-strong: rgba(255, 200, 100, 0.14);
-  --ink-0: #f8f2e6;
-  --ink-1: #d4c9b0;
-  --ink-2: #9a8e76;
-  --ink-3: #6b6250;
-  --ink-4: #453d2e;
-  --accent: #f59e0b;
-  --accent-2: #f97316;
-  --accent-3: #ef4444;
-  --warn: #f97316;
-  --warn-soft: rgba(249, 115, 22, 0.14);
-  --shadow-card: 0 1px 0 rgba(255,200,80,0.04) inset, 0 8px 24px rgba(0,0,0,0.45);
-}
-[data-theme="warm"] .app::before {
-  background:
-    radial-gradient(900px 500px at 75% -10%, rgba(245, 158, 11, 0.1), transparent 60%),
-    radial-gradient(700px 400px at 10% 110%, rgba(249, 115, 22, 0.06), transparent 60%);
-}
 
 * { box-sizing: border-box; }
 
