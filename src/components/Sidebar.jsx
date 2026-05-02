@@ -13,8 +13,7 @@ function useTheme() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('hacienda_theme', theme)
   }, [theme])
-  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
-  return { theme, toggle }
+  return { theme, setTheme }
 }
 
 const LANGS = [
@@ -28,7 +27,7 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { t, i18n } = useTranslation()
-  const { theme, toggle: toggleTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   const email    = session?.user?.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
@@ -122,41 +121,56 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Language + theme row */}
-      <div style={{ display: 'flex', gap: 4, padding: '0 16px 12px' }}>
+      {/* Language row */}
+      <div style={{ display: 'flex', gap: 4, padding: '0 10px 5px' }}>
         {LANGS.map(({ code, label }) => (
           <button key={code} onClick={() => i18n.changeLanguage(code)}
             style={{
-              flex: 1, height: 28, borderRadius: 6, border: '1px solid',
+              flex: 1, height: 26, borderRadius: 6, border: '1px solid',
               borderColor: i18n.language === code ? 'var(--accent)' : 'var(--line-strong)',
-              background: i18n.language === code ? 'rgba(99,102,241,.15)' : 'transparent',
+              background: i18n.language === code ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : 'transparent',
               color: i18n.language === code ? 'var(--accent)' : 'var(--ink-3)',
               fontSize: 11, fontWeight: 600, cursor: 'pointer',
             }}>
             {label}
           </button>
         ))}
-        <button onClick={toggleTheme}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          style={{
-            width: 28, height: 28, borderRadius: 6, border: '1px solid var(--line-strong)',
-            background: 'transparent', color: 'var(--ink-3)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, flexShrink: 0,
-          }}>
-          {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
+      </div>
+
+      {/* Theme row */}
+      <div style={{ display: 'flex', gap: 4, padding: '0 10px 10px' }}>
+        {[
+          { id: 'dark',  icon: '🌙', label: 'Dark' },
+          { id: 'light', icon: '☀️', label: 'Light' },
+          { id: 'warm',  icon: '🔥', label: 'Warm' },
+        ].map(({ id, icon, label }) => (
+          <button key={id} onClick={() => setTheme(id)}
+            style={{
+              flex: 1, height: 26, borderRadius: 6, border: '1px solid',
+              borderColor: theme === id ? 'var(--accent)' : 'var(--line-strong)',
+              background: theme === id ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : 'transparent',
+              color: theme === id ? 'var(--accent)' : 'var(--ink-3)',
+              fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+            }}>
+            <span style={{ fontSize: 11 }}>{icon}</span>{label}
+          </button>
+        ))}
       </div>
 
       <div className="sb-user">
-        <div className="sb-avatar">{initials}</div>
-        <div>
-          <div className="sb-user-name">{email}</div>
-          <div className="sb-user-plan">{t('brand.plan')}</div>
+        <div className="sb-user-card">
+          <div className="sb-avatar-lg">
+            {(myName || email).slice(0, 2).toUpperCase()}
+          </div>
+          <div className="sb-user-info">
+            <div className="sb-user-display">{myName || email.split('@')[0]}</div>
+            <div className="sb-user-email" title={email}>{email}</div>
+          </div>
+          <button className="sb-signout" title="Sign out" onClick={() => supabase.auth.signOut()}>
+            <Icon name="logout" size={14} />
+          </button>
         </div>
-        <button className="sb-cog icon-btn" onClick={() => supabase.auth.signOut()}>
-          <Icon name="cog" size={15} />
-        </button>
       </div>
     </aside>
   )
