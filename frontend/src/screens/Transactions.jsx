@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import Icon from '../components/Icon'
@@ -52,16 +52,20 @@ export default function Transactions({ type }) {
   const [bulkVals, setBulkVals]         = useState({ account_id: '', category_id: '', person: '', status: '' })
   const [applying, setApplying]         = useState(false)
   const { t }    = useTranslation()
-  const location = useLocation()
+  const location        = useLocation()
+  const handledTxId     = useRef(null)
 
   useEffect(() => { setActiveFilter(type || 'all') }, [type])
   useEffect(() => { setActivePerson('all') }, [isFamily])
   useEffect(() => { setSelectedIds(new Set()) }, [filterMonth, activeFilter, activePerson, filterCat, filterAcct, filterDesc])
 
-  // Handle navigation from global search
+  // Handle navigation from global search — guard with ref so re-renders from
+  // transactions state updates don't reopen the modal after it's been closed.
   useEffect(() => {
     const { openTxId, month } = location.state || {}
     if (!openTxId || !transactions.length) return
+    if (openTxId === handledTxId.current) return
+    handledTxId.current = openTxId
     if (month) setFilterMonth(month)
     const tx = transactions.find(t => t.id === openTxId)
     if (tx) {
