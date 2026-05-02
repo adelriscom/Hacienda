@@ -15,7 +15,7 @@ const fmtDate = s => new Date(s).toLocaleDateString('en-CA', { day: 'numeric', m
 const fmtAmt  = n => (n > 0 ? '+' : '−') + '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function Topbar({ greet, date, action, onAction, children }) {
-  const { t }    = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { query, setQuery, results, loading, open, setOpen, clear } = useSearch()
   const { items: notifs, count: notifCount } = useNotifications()
