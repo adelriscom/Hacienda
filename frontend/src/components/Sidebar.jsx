@@ -6,6 +6,7 @@ import { useHousehold } from '../lib/household'
 import Icon from './Icon'
 import { useSidebarCounts } from '../hooks/useSidebarCounts'
 import { useTheme } from '../hooks/useTheme'
+import { useSidebar } from '../lib/sidebar'
 
 export default function Sidebar() {
   const location = useLocation()
@@ -18,6 +19,7 @@ export default function Sidebar() {
   const initials = email.slice(0, 2).toUpperCase()
   const counts   = useSidebarCounts()
   const { household, members, myName, viewMode, setViewMode, isFamily } = useHousehold()
+  const { open, close } = useSidebar()
 
   const badge = (n) => (n === null || n === 0) ? undefined : String(n)
 
@@ -39,7 +41,7 @@ export default function Sidebar() {
   const Item = ({ it }) => {
     const active = location.pathname === it.path
     return (
-      <div className={`sb-item ${active ? 'active' : ''}`} onClick={() => navigate(it.path)}>
+      <div className={`sb-item ${active ? 'active' : ''}`} onClick={() => { navigate(it.path); close() }}>
         <Icon name={it.icon} className="ico" />
         <span>{it.label}</span>
         {it.badge && <span className={`badge ${it.badgeKind || ''}`}>{it.badge}</span>}
@@ -48,7 +50,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${open ? ' open' : ''}`}>
       <div className="sb-brand">
         <div className="sb-logo">H</div>
         <div>

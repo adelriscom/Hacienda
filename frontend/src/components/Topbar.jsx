@@ -5,6 +5,7 @@ import Icon from './Icon'
 import { useSearch } from '../hooks/useSearch'
 import { useNotifications } from '../hooks/useNotifications'
 import { useTheme } from '../hooks/useTheme'
+import { useSidebar } from '../lib/sidebar'
 
 const LANGS = [
   { code: 'en', label: 'English',  flag: '🇨🇦' },
@@ -22,6 +23,7 @@ export default function Topbar({ greet, date, action, onAction, children }) {
   const { items: notifs, count: notifCount } = useNotifications()
   const { theme, toggle: toggleTheme } = useTheme()
 
+  const { toggle: toggleSidebar } = useSidebar()
   const searchRef = useRef(null)
   const bellRef   = useRef(null)
   const langRef   = useRef(null)
@@ -63,6 +65,9 @@ export default function Topbar({ greet, date, action, onAction, children }) {
 
   return (
     <div className="topbar">
+      <button className="hamburger icon-btn" onClick={toggleSidebar} aria-label="Menu">
+        <Icon name="menu" size={18} />
+      </button>
       <div className="greet">
         <h1>{greet}</h1>
         <p>{date}</p>

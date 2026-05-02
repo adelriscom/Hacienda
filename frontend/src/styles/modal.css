@@ -213,3 +213,24 @@
   color: var(--ink-3);
   margin-top: 2px;
 }
+
+/* ── Mobile: modal slides up as bottom sheet ── */
+@media (max-width: 768px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-card {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 92vh;
+    border-bottom: none;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .form-grid .span-2 {
+    grid-column: 1 !important;
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import { SidebarProvider, useSidebar } from '../lib/sidebar'
 import Dashboard from '../screens/Dashboard'
 import Transactions from '../screens/Transactions'
 import Budgets from '../screens/Budgets'
@@ -26,13 +27,15 @@ function applyAccent(name) {
   document.documentElement.style.setProperty('--accent-3', a.c)
 }
 
-export default function Shell() {
+function ShellInner() {
   const [accent] = useState('indigo')
+  const { open, close } = useSidebar()
   useEffect(() => applyAccent(accent), [accent])
 
   return (
     <div className="app">
       <div className="app-shell">
+        {open && <div className="sb-backdrop" onClick={close} />}
         <Sidebar />
         <main className="main">
           <Routes>
@@ -52,5 +55,13 @@ export default function Shell() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function Shell() {
+  return (
+    <SidebarProvider>
+      <ShellInner />
+    </SidebarProvider>
   )
 }

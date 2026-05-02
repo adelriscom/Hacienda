@@ -288,3 +288,23 @@
 .up-amt { font-size: 13px; font-weight: 600; }
 .ok-chip { background: var(--pos-soft); color: var(--pos); }
 .warn-chip { background: var(--warn-soft); color: var(--warn); }
+
+/* ── Mobile dashboard ── */
+@media (max-width: 768px) {
+  /* Hero card: stack vertically */
+  .hero-balance { flex-direction: column !important; gap: 14px; }
+  .hero-right    { flex-direction: row; width: 100%; }
+  .hero-pill     { flex: 1; min-width: 0; }
+
+  /* Shrink hero number */
+  .num-hero { font-size: 32px !important; }
+
+  /* KPI grid: 2 columns on mobile */
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Bar chart: shorter on mobile */
+  .bars { height: 120px !important; }
+
+  /* Donut: smaller */
+  .donut-wrap svg { width: 130px !important; height: 130px !important; }
+}
