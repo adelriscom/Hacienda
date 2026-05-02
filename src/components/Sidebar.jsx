@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
@@ -5,6 +6,16 @@ import { useAuth } from '../lib/auth'
 import { useHousehold } from '../lib/household'
 import Icon from './Icon'
 import { useSidebarCounts } from '../hooks/useSidebarCounts'
+
+function useTheme() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('hacienda_theme') || 'dark')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('hacienda_theme', theme)
+  }, [theme])
+  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+  return { theme, toggle }
+}
 
 const LANGS = [
   { code: 'en', label: 'EN' },
@@ -17,6 +28,7 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { t, i18n } = useTranslation()
+  const { theme, toggle: toggleTheme } = useTheme()
 
   const email    = session?.user?.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
@@ -110,13 +122,13 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Language selector */}
-      <div style={{ display: 'flex', gap: 4, padding: '0 16px 12px', justifyContent: 'center' }}>
+      {/* Language + theme row */}
+      <div style={{ display: 'flex', gap: 4, padding: '0 16px 12px' }}>
         {LANGS.map(({ code, label }) => (
           <button key={code} onClick={() => i18n.changeLanguage(code)}
             style={{
               flex: 1, height: 28, borderRadius: 6, border: '1px solid',
-              borderColor: i18n.language === code ? 'var(--accent)' : 'var(--border)',
+              borderColor: i18n.language === code ? 'var(--accent)' : 'var(--line-strong)',
               background: i18n.language === code ? 'rgba(99,102,241,.15)' : 'transparent',
               color: i18n.language === code ? 'var(--accent)' : 'var(--ink-3)',
               fontSize: 11, fontWeight: 600, cursor: 'pointer',
@@ -124,6 +136,16 @@ export default function Sidebar() {
             {label}
           </button>
         ))}
+        <button onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            width: 28, height: 28, borderRadius: 6, border: '1px solid var(--line-strong)',
+            background: 'transparent', color: 'var(--ink-3)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 14, flexShrink: 0,
+          }}>
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
       </div>
 
       <div className="sb-user">

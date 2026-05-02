@@ -32,6 +32,12 @@ export default function Accounts() {
   const cadAccounts = visibleAccounts.filter(a => a.currency === 'CAD')
   const copAccounts = visibleAccounts.filter(a => a.currency === 'COP')
 
+  const activeAccounts = accounts.filter(a => a.is_active)
+  const cadNet = activeAccounts.filter(a => a.currency === 'CAD').reduce((s, a) => s + (a.balance || 0), 0)
+  const copNet = activeAccounts.filter(a => a.currency === 'COP').reduce((s, a) => s + (a.balance || 0), 0)
+  const fmtCAD = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmtCOP = n => '$ ' + Math.round(n).toLocaleString('es-CO')
+
   return (
     <>
       <Topbar greet={t('acct.title')} date={t('acct.subtitle', { total: accounts.length })}>
@@ -44,6 +50,38 @@ export default function Accounts() {
           <Icon name="plus" size={12} /> {t('acct.addBtn')}
         </button>
       </Topbar>
+
+      {/* Net worth summary */}
+      {!loading && activeAccounts.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+          {cadAccounts.length > 0 && (
+            <div className="card" style={{ flex: 1, padding: '14px 18px' }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 6 }}>
+                CAD Net Worth
+              </div>
+              <div className="num" style={{ fontSize: 22, fontWeight: 700, color: cadNet >= 0 ? 'var(--pos)' : 'var(--neg)' }}>
+                {fmtCAD(cadNet)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {cadAccounts.length} active account{cadAccounts.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
+          {copAccounts.length > 0 && (
+            <div className="card" style={{ flex: 1, padding: '14px 18px' }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 6 }}>
+                COP Net Worth
+              </div>
+              <div className="num" style={{ fontSize: 22, fontWeight: 700, color: copNet >= 0 ? 'var(--pos)' : 'var(--neg)' }}>
+                {fmtCOP(copNet)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+                {copAccounts.length} active account{copAccounts.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('acct.loading')}</div>

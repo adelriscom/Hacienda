@@ -142,12 +142,26 @@ export default function Budgets() {
 }
 
 function Envelope({ budget: b, spent, onEdit, t }) {
-  const pct  = b.amount > 0 ? Math.min((spent / b.amount) * 100, 120) : 0
-  const over = spent > b.amount
-  const color = b.category?.color || 'var(--accent)'
+  const rawPct  = b.amount > 0 ? (spent / b.amount) * 100 : 0
+  const pct     = Math.min(rawPct, 120)
+  const over    = spent > b.amount
+  const warning = !over && rawPct >= 80
+  const mPct    = monthPctNow()
+  const ahead   = !over && rawPct > mPct + 10
+  const color   = b.category?.color || 'var(--accent)'
+  const barColor = over ? 'var(--neg)' : warning ? 'var(--warn)' : color
+
+  const chipClass = over ? 'tag-warn' : warning ? 'tag-warn' : ahead ? '' : 'tag-ok'
+  const chipLabel = over
+    ? `🔴 ${t('budget.over')} (${Math.round(rawPct)}%)`
+    : warning
+      ? `⚠️ ${Math.round(rawPct)}% used`
+      : ahead
+        ? t('budget.aheadPace')
+        : t('budget.onPace')
 
   return (
-    <div className={`envelope ${over ? 'envelope-over' : ''}`}>
+    <div className={`envelope ${over ? 'envelope-over' : warning ? 'envelope-warn' : ''}`}>
       <div className="env-head">
         <div className="env-icon" style={{ background: `${color}22`, color }}>
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
@@ -158,16 +172,19 @@ function Envelope({ budget: b, spent, onEdit, t }) {
         </button>
       </div>
       <div className="env-amt">
-        <span className="num num-md">${spent.toLocaleString('en-CA', { maximumFractionDigits: 0 })}</span>
+        <span className="num num-md" style={{ color: over ? 'var(--neg)' : warning ? 'var(--warn)' : undefined }}>
+          ${spent.toLocaleString('en-CA', { maximumFractionDigits: 0 })}
+        </span>
         <span className="env-of">/ ${b.amount.toLocaleString('en-CA', { maximumFractionDigits: 0 })}</span>
       </div>
       <div className="env-bar">
-        <div className="env-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: over ? 'var(--neg)' : color }} />
+        <div className="env-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
         {over && <div className="env-bar-over" style={{ width: `${pct - 100}%`, left: '100%' }} />}
       </div>
       <div className="env-foot">
-        <span className={`chip ${over ? 'tag-warn' : pct < monthPctNow() * 0.8 ? 'tag-ok' : ''}`}>
-          {over ? t('budget.over') : pct > monthPctNow() ? t('budget.aheadPace') : t('budget.onPace')}
+        <span className={`chip ${chipClass}`}>{chipLabel}</span>
+        <span style={{ fontSize: 10.5, color: 'var(--ink-3)', marginLeft: 'auto' }}>
+          {Math.round(rawPct)}%
         </span>
       </div>
     </div>
