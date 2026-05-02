@@ -85,7 +85,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--ink-0);
-  font-size: 13px;
+  font-size: 12.5px;
   font-family: inherit;
   outline: none;
   transition: border-color .15s;
