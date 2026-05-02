@@ -156,10 +156,35 @@ export default function Transactions({ type }) {
   const setBulk = (k, v) => setBulkVals(prev => ({ ...prev, [k]: v }))
   const bulkReady = Object.values(bulkVals).some(v => v !== '')
 
+  function exportCSV() {
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`
+    const headers = ['Date', 'Description', 'Category', 'Account', 'Person', 'Type', 'Status', 'Amount']
+    const rows = filtered.map(tx => [
+      tx.occurred_at.slice(0, 10),
+      esc(tx.description),
+      esc(tx.category?.name),
+      esc(tx.account?.name),
+      esc(tx.person),
+      tx.type,
+      tx.status,
+      tx.amount.toFixed(2),
+    ].join(','))
+    const csv  = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = Object.assign(document.createElement('a'), { href: url, download: `hacienda-${filterMonth}.csv` })
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <Topbar greet={pageTitle}
         date={t('transactions.subtitle', { month: fmtMonth(filterMonth), total, review })}>
+        <button className="btn ghost sm" onClick={exportCSV} disabled={filtered.length === 0}
+          title={`Export ${filtered.length} transactions to CSV`}>
+          <Icon name="download" size={12} /> CSV
+        </button>
         <button className="btn ghost sm" onClick={() => setShowImport(true)}>
           <Icon name="upload" size={12} /> {t('transactions.importBtn')}
         </button>
