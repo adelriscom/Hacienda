@@ -75,13 +75,15 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="sb-section">{t('nav.principal')}</div>
-      {principal.map(it => <Item key={it.id} it={it} />)}
+      <div className="sb-nav-scroll">
+        <div className="sb-section">{t('nav.principal')}</div>
+        {principal.map(it => <Item key={it.id} it={it} />)}
 
-      <div className="sb-section">{t('nav.tools')}</div>
-      {tools.map(it => <Item key={it.id} it={it} />)}
+        <div className="sb-section">{t('nav.tools')}</div>
+        {tools.map(it => <Item key={it.id} it={it} />)}
+      </div>
 
-      <div className="sb-spacer" />
+      <div className="sb-bottom">
 
       {/* Household view toggle */}
       {household && (
@@ -174,6 +176,8 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
+
+      </div>{/* sb-bottom */}
     </aside>
   )
 }

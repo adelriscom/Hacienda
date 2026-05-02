@@ -107,11 +107,23 @@
 .sidebar {
   background: var(--bg-1);
   border-right: 1px solid var(--line);
-  padding: 18px 14px;
+  padding: 18px 14px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding-bottom: 6px;
 }
+.sb-nav-scroll::-webkit-scrollbar { width: 3px; }
+.sb-nav-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 2px; }
+.sb-bottom { flex-shrink: 0; padding-bottom: 8px; }
 .sb-brand {
   display: flex;
   align-items: center;
