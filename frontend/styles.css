@@ -525,6 +525,10 @@
   /* Month nav label — override inline minWidth */
   .topbar span[style*="minWidth"] { min-width: auto !important; font-size: 11px !important; }
 
+  /* Topbar action buttons: hide secondary (CSV, Import), shrink primary to icon-only */
+  .topbar-secondary { display: none !important; }
+  .topbar .btn-label { display: none; }
+
   /* Main content padding */
   .main { padding: 14px 14px 24px; }
 

@@ -57,8 +57,8 @@ export default function Budgets() {
           <button className="btn ghost sm" style={{ padding: '0 8px' }}
             onClick={() => setFilterMonth(m => shiftMonth(m, 1))}>→</button>
         </div>
-        <button className="btn primary sm" onClick={() => setEditing('new')}>
-          <Icon name="plus" size={12} /> {t('budget.addBtn')}
+        <button className="btn primary sm" onClick={() => setEditing('new')} title={t('budget.addBtn')}>
+          <Icon name="plus" size={12} /> <span className="btn-label">{t('budget.addBtn')}</span>
         </button>
       </Topbar>
 

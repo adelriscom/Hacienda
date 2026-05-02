@@ -9,15 +9,15 @@ export function useBudgets(month) {
   const load = useCallback(async () => {
     setLoading(true)
     const [y, m] = month.split('-').map(Number)
-    const monthStart = `${month}-01`
-    const nextDate   = new Date(y, m, 1)
-    const monthEnd   = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-01`
+    const start    = `${month}-01`
+    const nextDate = new Date(y, m, 1)
+    const monthEnd = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-01`
 
     const [{ data: budgetData }, { data: txData }] = await Promise.all([
-      supabase.from('budgets').select('*, category:categories(name, color)').eq('month', month),
+      supabase.from('budgets').select('*, category:categories(name, color)').eq('month', start),
       supabase.from('transactions')
         .select('category_id, amount')
-        .gte('occurred_at', monthStart)
+        .gte('occurred_at', start)
         .lt('occurred_at', monthEnd)
         .lt('amount', 0),
     ])
@@ -38,7 +38,7 @@ export function useBudgets(month) {
     const { data: { session } } = await supabase.auth.getSession()
     const user_id = session?.user?.id
     const { error } = await supabase.from('budgets')
-      .upsert([{ user_id, category_id, month, amount: parseFloat(amount) }],
+      .upsert([{ user_id, category_id, month: `${month}-01`, amount: parseFloat(amount) }],
               { onConflict: 'user_id,category_id,month' })
     if (error) throw error
     await load()

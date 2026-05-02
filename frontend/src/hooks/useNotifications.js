@@ -44,7 +44,7 @@ export function useNotifications() {
       const { data: budgets } = await supabase
         .from('budgets')
         .select('id, amount, category_id, category:categories(name, color)')
-        .eq('month', ym)
+        .eq('month', start)
 
       if (budgets?.length) {
         let txQ = supabase

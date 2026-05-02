@@ -197,15 +197,15 @@ export default function Transactions({ type }) {
     <>
       <Topbar greet={pageTitle}
         date={t('transactions.subtitle', { month: fmtMonth(filterMonth), total, review })}>
-        <button className="btn ghost sm" onClick={exportCSV} disabled={filtered.length === 0}
+        <button className="btn ghost sm topbar-secondary" onClick={exportCSV} disabled={filtered.length === 0}
           title={`Export ${filtered.length} transactions to CSV`}>
           <Icon name="download" size={12} /> CSV
         </button>
-        <button className="btn ghost sm" onClick={() => setShowImport(true)}>
+        <button className="btn ghost sm topbar-secondary" onClick={() => setShowImport(true)}>
           <Icon name="upload" size={12} /> {t('transactions.importBtn')}
         </button>
-        <button className="btn primary sm" onClick={() => setShowNew(true)}>
-          <Icon name="plus" size={12} /> {t('transactions.newBtn')}
+        <button className="btn primary sm" onClick={() => setShowNew(true)} title={t('transactions.newBtn')}>
+          <Icon name="plus" size={12} /> <span className="btn-label">{t('transactions.newBtn')}</span>
         </button>
       </Topbar>
 
