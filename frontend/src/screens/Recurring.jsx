@@ -2,15 +2,19 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
+import NewTransactionModal from '../components/NewTransactionModal'
 import { useRecurring } from '../hooks/useRecurring'
+import { useTransactions } from '../hooks/useTransactions'
 
 const fmt     = n => '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK    = n => Math.abs(n) >= 1000 ? `$${(Math.abs(n) / 1000).toFixed(1)}k` : fmt(n)
 const fmtDate = d => new Date(d).toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
 
 export default function Recurring() {
-  const { items, loading } = useRecurring()
+  const { items, loading, removeRecurring, refresh } = useRecurring()
+  const { addTransaction } = useTransactions()
   const { t } = useTranslation()
+  const [showNew, setShowNew] = useState(false)
 
   const incomeItems  = items.filter(i => i.amount > 0)
   const expenseItems = items.filter(i => i.amount < 0)
@@ -19,10 +23,20 @@ export default function Recurring() {
   const monthlyExpenses = expenseItems.reduce((s, i) => s + Math.abs(i.amount), 0)
   const net = monthlyIncome - monthlyExpenses
 
+  async function handleAdd(values) {
+    await addTransaction({ ...values, is_recurring: true })
+    await refresh()
+    setShowNew(false)
+  }
+
   return (
     <>
       <Topbar greet={t('recurring.title')}
-        date={t('recurring.subtitle', { income: incomeItems.length, expenses: expenseItems.length })} />
+        date={t('recurring.subtitle', { income: incomeItems.length, expenses: expenseItems.length })}>
+        <button className="btn primary sm" onClick={() => setShowNew(true)}>
+          <Icon name="plus" size={12} /> Add recurring
+        </button>
+      </Topbar>
 
       {/* KPI summary */}
       {!loading && items.length > 0 && (
@@ -39,13 +53,27 @@ export default function Recurring() {
       {loading ? (
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('recurring.loading')}</div>
       ) : items.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>{t('recurring.empty')}</div>
+        <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔁</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 6 }}>No recurring transactions yet</div>
+          <div style={{ fontSize: 13, marginBottom: 20 }}>Track subscriptions, rent, salary and any fixed transactions.</div>
+          <button className="btn primary" onClick={() => setShowNew(true)}>
+            <Icon name="plus" size={14} /> Add your first recurring
+          </button>
+        </div>
       ) : (
         <div className="grid-2">
-          {/* Income */}
           <Section title={t('recurring.incomeSection')}  items={incomeItems}  onRemove={removeRecurring} t={t} />
           <Section title={t('recurring.expenseSection')} items={expenseItems} onRemove={removeRecurring} t={t} />
         </div>
+      )}
+
+      {showNew && (
+        <NewTransactionModal
+          onClose={() => setShowNew(false)}
+          onSave={handleAdd}
+          defaults={{ is_recurring: true }}
+        />
       )}
     </>
   )

@@ -26,13 +26,13 @@ function initForm(tx) {
   }
 }
 
-export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelete, transaction }) {
+export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelete, transaction, defaults }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { t } = useTranslation()
   const isEdit = !!transaction
 
-  const [form, setForm]       = useState(() => initForm(transaction))
+  const [form, setForm]       = useState(() => ({ ...initForm(transaction), ...defaults }))
   const [saving, setSaving]   = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
