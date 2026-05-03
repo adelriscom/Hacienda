@@ -122,6 +122,20 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
               </div>
             </div>
 
+            {form.type === 'transfer' && (
+              <div className="span-2" style={{
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+                background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)',
+                borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5,
+              }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>💡</span>
+                <span>
+                  Record only the <strong>outgoing</strong> side here (e.g. from Chequing).
+                  Do <strong>not</strong> record the receiving account as income — that would count the money twice.
+                </span>
+              </div>
+            )}
+
             <div className="form-field">
               <label>{t('newTx.date')}</label>
               <input type="date" value={form.occurred_at}
