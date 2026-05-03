@@ -12,9 +12,10 @@ const fmtDate = d => new Date(d).toLocaleDateString('en-CA', { day: 'numeric', m
 
 export default function Recurring() {
   const { items, loading, removeRecurring, refresh } = useRecurring()
-  const { addTransaction } = useTransactions()
+  const { addTransaction, updateTransaction, deleteTransaction } = useTransactions()
   const { t } = useTranslation()
-  const [showNew, setShowNew] = useState(false)
+  const [showNew,     setShowNew]     = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
 
   const incomeItems  = items.filter(i => i.amount > 0)
   const expenseItems = items.filter(i => i.amount < 0)
@@ -63,8 +64,8 @@ export default function Recurring() {
         </div>
       ) : (
         <div className="grid-2">
-          <Section title={t('recurring.incomeSection')}  items={incomeItems}  onRemove={removeRecurring} t={t} />
-          <Section title={t('recurring.expenseSection')} items={expenseItems} onRemove={removeRecurring} t={t} />
+          <Section title={t('recurring.incomeSection')}  items={incomeItems}  onRemove={removeRecurring} onEdit={setEditingItem} t={t} />
+          <Section title={t('recurring.expenseSection')} items={expenseItems} onRemove={removeRecurring} onEdit={setEditingItem} t={t} />
         </div>
       )}
 
@@ -75,11 +76,19 @@ export default function Recurring() {
           defaults={{ is_recurring: true }}
         />
       )}
+      {editingItem && (
+        <NewTransactionModal
+          transaction={editingItem}
+          onClose={() => setEditingItem(null)}
+          onUpdate={async (id, values) => { await updateTransaction(id, values); await refresh(); setEditingItem(null) }}
+          onDelete={async (id) => { await deleteTransaction(id); await refresh(); setEditingItem(null) }}
+        />
+      )}
     </>
   )
 }
 
-function Section({ title, items, onRemove, t }) {
+function Section({ title, items, onRemove, onEdit, t }) {
   if (items.length === 0) return null
   return (
     <div className="card">
@@ -90,13 +99,13 @@ function Section({ title, items, onRemove, t }) {
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {items.map(item => <RecurringRow key={item.id} item={item} onRemove={onRemove} t={t} />)}
+        {items.map(item => <RecurringRow key={item.id} item={item} onRemove={onRemove} onEdit={onEdit} t={t} />)}
       </div>
     </div>
   )
 }
 
-function RecurringRow({ item, onRemove, t }) {
+function RecurringRow({ item, onRemove, onEdit, t }) {
   const [confirming, setConfirming] = useState(false)
   const color = item.category?.color || 'var(--accent)'
   const isIncome = item.amount > 0
@@ -178,22 +187,27 @@ function RecurringRow({ item, onRemove, t }) {
         {isIncome ? '+' : '−'}{fmt(item.amount)}
       </div>
 
-      {/* Remove button */}
-      <div style={{ flexShrink: 0 }}>
+      {/* Edit / Remove buttons */}
+      <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
         {confirming ? (
-          <div style={{ display: 'flex', gap: 4 }}>
+          <>
             <button className="btn ghost sm" style={{ fontSize: 11, color: 'var(--neg)' }}
               onClick={() => onRemove(item.id)}>
               {t('recurring.confirm')}
             </button>
             <button className="btn ghost sm" style={{ fontSize: 11 }}
               onClick={() => setConfirming(false)}>✕</button>
-          </div>
+          </>
         ) : (
-          <button className="icon-btn sm-btn" title={t('recurring.remove')}
-            onClick={() => setConfirming(true)}>
-            <Icon name="x" size={13} />
-          </button>
+          <>
+            <button className="icon-btn sm-btn" title="Edit" onClick={() => onEdit(item)}>
+              <Icon name="edit" size={13} />
+            </button>
+            <button className="icon-btn sm-btn" title={t('recurring.remove')}
+              onClick={() => setConfirming(true)}>
+              <Icon name="x" size={13} />
+            </button>
+          </>
         )}
       </div>
     </div>
