@@ -226,21 +226,27 @@
 
 /* ── Mobile: modal slides up as bottom sheet ── */
 @media (max-width: 768px) {
+  /* Overlay scrolls — avoids iOS Safari overflow-in-fixed bugs */
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .modal-card {
     max-width: 100%;
     width: 100%;
     border-radius: 20px 20px 0 0;
-    max-height: 92vh;
-    max-height: 92dvh; /* dvh excludes Safari browser chrome — prevents footer cutoff */
+    max-height: none; /* card grows to content; overlay scrolls */
     border-bottom: none;
+    flex-shrink: 0;
+  }
+  /* restore body/form to normal flow — no internal scroll needed */
+  .modal-card > form {
+    overflow: visible;
   }
   .modal-body {
-    overflow-y: scroll; /* force scroll on iOS Safari */
-    -webkit-overflow-scrolling: touch;
+    overflow-y: visible;
   }
   .modal-footer {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
