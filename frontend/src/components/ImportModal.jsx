@@ -223,13 +223,11 @@ export default function ImportModal({ onClose, onSave }) {
 
   async function applySheet(workbook, sheetName) {
     const result = parseSheet(workbook.Sheets[sheetName], categories, accounts)
-    setSelectedSheet(sheetName)
-    setStats({ total: result.rows.length, ...result })
-    setStep('preview')
 
     // Duplicate detection: query existing transactions for the same date range
     const dates = result.rows.map(r => r.occurred_at.slice(0, 10)).filter(Boolean)
     let taggedRows = result.rows
+    let dups = 0
     if (dates.length > 0) {
       const minDate = dates.reduce((a, b) => a < b ? a : b)
       const maxDate = dates.reduce((a, b) => a > b ? a : b)
@@ -249,14 +247,17 @@ export default function ImportModal({ onClose, onSave }) {
           `${r.occurred_at.slice(0,10)}|${r.amount}|${r.description?.toLowerCase()}`
         ),
       }))
-      const dups = taggedRows.filter(r => r._isDup).length
-      setDupCount(dups)
-      setSkipDups(dups > 0)
-    } else {
-      setDupCount(0)
+      dups = taggedRows.filter(r => r._isDup).length
     }
+    // Set all state together after the await so React batches into one render
+    // and the preview table never sees preview=null while step='preview'
+    setSelectedSheet(sheetName)
+    setStats({ total: result.rows.length, ...result })
     setRows(taggedRows)
     setPreview(taggedRows.slice(0, 15))
+    setDupCount(dups)
+    setSkipDups(dups > 0)
+    setStep('preview')
   }
 
   function handleSheetConfirm() {
