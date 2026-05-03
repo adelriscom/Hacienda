@@ -38,24 +38,27 @@ function norm(s) {
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
-// Map from canonical field name → accepted aliases
+// Map from canonical field name → accepted aliases (first match wins, so higher-priority aliases come first)
 const ALIASES = {
   fecha:       ['fecha', 'date', 'fecha de pago', 'dia', 'day', 'periodo', 'f.'],
   descripcion: ['descripcion', 'description', 'concepto', 'detail', 'detalle', 'comercio', 'merchant'],
-  monto:       ['monto', 'amount', 'valor', 'value', 'importe', 'total', 'costo', 'cost'],
-  tipo:        ['tipo', 'type', 'class', 'clase'],
+  monto:       ['signed amount', 'monto', 'amount', 'valor', 'value', 'importe', 'total', 'costo', 'cost'],
+  tipo:        ['direction', 'tipo', 'type', 'class', 'clase'],
   categoria:   ['categoria', 'category', 'cat', 'rubro'],
-  cuenta:      ['cuenta', 'account', 'banco', 'bank', 'tarjeta'],
+  cuenta:      ['account name', 'cuenta', 'account', 'banco', 'bank', 'tarjeta'],
   quien:       ['quien', 'who', 'persona', 'person', 'responsable'],
-  notas:       ['notas', 'notes', 'nota', 'note', 'comentario', 'comment'],
+  notas:       ['transaction category', 'notas', 'notes', 'nota', 'note', 'comentario', 'comment'],
 }
 
 function buildHeaderMap(rawHeaders) {
   const normed = rawHeaders.map(norm)
   const map = {}
+  // Check aliases in priority order so earlier aliases win over later ones
   for (const [field, aliases] of Object.entries(ALIASES)) {
-    const i = normed.findIndex(h => aliases.includes(h))
-    if (i >= 0) map[field] = i
+    for (const alias of aliases) {
+      const i = normed.indexOf(alias)
+      if (i >= 0) { map[field] = i; break }
+    }
   }
   return map
 }
@@ -135,7 +138,9 @@ function parseSheet(ws, categories, accounts) {
         const rawDateVal = dateColIdx >= 0 ? r[dateColIdx] : ''
         const isoTs  = rawDateVal !== '' ? parseDate(rawDateVal) : null
         const rawAmt = parseAmount(get(r, 'monto'))
-        const tipo   = (get(r, 'tipo') || 'expense').toLowerCase()
+        let tipo = (get(r, 'tipo') || 'expense').toLowerCase()
+        if (tipo === 'credit') tipo = 'income'
+        else if (tipo === 'debit') tipo = 'expense'
         return {
           occurred_at:   isoTs ? new Date(isoTs).toISOString() : new Date().toISOString(),
           category_name: get(r, 'categoria'),
