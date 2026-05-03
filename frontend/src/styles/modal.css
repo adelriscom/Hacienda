@@ -44,6 +44,7 @@
   padding: 20px 24px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0; /* allows flex item to shrink so footer stays visible */
 }
 
 .modal-footer {
