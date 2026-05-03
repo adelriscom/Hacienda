@@ -225,7 +225,15 @@
     width: 100%;
     border-radius: 20px 20px 0 0;
     max-height: 92vh;
+    max-height: 92dvh; /* dvh excludes Safari browser chrome — prevents footer cutoff */
     border-bottom: none;
+  }
+  .modal-body {
+    overflow-y: scroll; /* force scroll on iOS Safari */
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-footer {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
   .form-grid {
     grid-template-columns: 1fr !important;
