@@ -4,6 +4,7 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
+import { useRecurring } from '../hooks/useRecurring'
 
 function nowMonth() {
   const d = new Date()
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const { isFamily, myUserId }      = useHousehold()
   const didAutoJump = useRef(false)
   const navigate    = useNavigate()
+  const { items: recurringItems }   = useRecurring()
 
   useEffect(() => {
     async function load() {
@@ -124,7 +126,16 @@ export default function Dashboard() {
 
   const fmt  = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)
-  const today = new Date().toLocaleDateString('en-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const todayLabel = new Date().toLocaleDateString('en-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
+  const upcoming = recurringItems
+    .map(item => {
+      const next = new Date(item._nextDate); next.setHours(0, 0, 0, 0)
+      return { ...item, _daysUntil: Math.ceil((next - todayMidnight) / 86400000) }
+    })
+    .filter(item => item._daysUntil <= 30)
+    .sort((a, b) => a._daysUntil - b._daysUntil)
 
   const nav = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -140,14 +151,14 @@ export default function Dashboard() {
 
   if (loading) return (
     <>
-      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
+      <Topbar greet="Dashboard" date={todayLabel}>{nav}</Topbar>
       <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>Loading…</div>
     </>
   )
 
   if (!stats?.income && !stats?.expenses) return (
     <>
-      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
+      <Topbar greet="Dashboard" date={todayLabel}>{nav}</Topbar>
       <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>
         No data for {fmtMonthLong(focusMonth)}.
       </div>
@@ -159,7 +170,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <Topbar greet="Dashboard" date={today}>{nav}</Topbar>
+      <Topbar greet="Dashboard" date={todayLabel}>{nav}</Topbar>
 
       <div className="card hero-balance">
         <div className="hero-left">
@@ -269,6 +280,61 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {upcoming.length > 0 && (
+        <div className="card insight">
+          <div className="insight-h">
+            <div className="insight-icon" style={{ background: 'rgba(99,102,241,.14)', color: 'var(--accent)' }}>
+              <Icon name="recurring" size={16} />
+            </div>
+            <div>
+              <div className="insight-title">Upcoming Payments</div>
+              <div className="insight-sub">
+                {upcoming.length} recurring {upcoming.length === 1 ? 'payment' : 'payments'} in the next 30 days
+              </div>
+            </div>
+          </div>
+          <div className="upcoming-list">
+            {upcoming.map(item => {
+              const { _daysUntil: d } = item
+              const isOverdue = d < 0
+              const isSoon    = d >= 0 && d <= 7
+              const chipBg    = isOverdue ? 'var(--neg-soft)'  : isSoon ? 'var(--warn-soft)' : 'var(--bg-3)'
+              const chipColor = isOverdue ? 'var(--neg)'       : isSoon ? 'var(--warn)'      : 'var(--ink-1)'
+              const next      = new Date(item._nextDate)
+              const dayNum    = next.getDate()
+              const mon       = next.toLocaleDateString('en-CA', { month: 'short' })
+              const dateLabel = isOverdue  ? `${Math.abs(d)}d ago`
+                              : d === 0   ? 'Today'
+                              : d === 1   ? 'Tmrw'
+                              : `${dayNum} ${mon}`
+              return (
+                <div key={item.id} className="up-row"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate('/recurring')}>
+                  <div className="up-date" style={{ background: chipBg, color: chipColor }}>
+                    {(isOverdue || d <= 1) ? (
+                      <div style={{ fontSize: 10, lineHeight: 1.3, textAlign: 'center' }}>{dateLabel}</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{dayNum}</div>
+                        <div style={{ fontSize: 10, lineHeight: 1.3 }}>{mon}</div>
+                      </>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="up-name">{item.description}</div>
+                    <div className="up-sub">{item._freq.label}{item.account?.name ? ` · ${item.account.name}` : ''}</div>
+                  </div>
+                  <div className="up-amt" style={{ color: item.amount < 0 ? 'var(--neg)' : 'var(--pos)' }}>
+                    {item.amount < 0 ? '−' : '+'}${Math.abs(item.amount).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </>
   )
 }

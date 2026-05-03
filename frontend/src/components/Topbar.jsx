@@ -61,7 +61,7 @@ export default function Topbar({ greet, date, action, onAction, children }) {
   }
 
   const SEVERITY_COLOR = { neg: 'var(--neg)', warn: 'var(--warn)', pos: 'var(--pos)' }
-  const TYPE_ICON      = { review: 'review', budget: 'budget' }
+  const TYPE_ICON      = { review: 'review', budget: 'budget', recurring: 'recurring' }
 
   return (
     <div className="topbar">
