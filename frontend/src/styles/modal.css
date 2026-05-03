@@ -226,30 +226,44 @@
 
 /* ── Mobile: modal slides up as bottom sheet ── */
 @media (max-width: 768px) {
-  /* Overlay scrolls — avoids iOS Safari overflow-in-fixed bugs */
   .modal-overlay {
     align-items: flex-end;
     padding: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
+  /* Card is the scroll container — more reliable than scrolling overlay or body on iOS */
   .modal-card {
     max-width: 100%;
     width: 100%;
     border-radius: 20px 20px 0 0;
-    max-height: none; /* card grows to content; overlay scrolls */
+    max-height: 88vh;
+    max-height: 88dvh;
     border-bottom: none;
-    flex-shrink: 0;
+    display: block;        /* disable flex so sticky positioning works */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  /* restore body/form to normal flow — no internal scroll needed */
+  /* Header sticks to top as user scrolls down through form */
+  .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-1);
+  }
+  /* Footer sticks to bottom as user scrolls up through form */
+  .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--bg-1);
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  /* Form and body: normal block flow inside scrolling card */
   .modal-card > form {
+    display: block;
     overflow: visible;
   }
   .modal-body {
     overflow-y: visible;
-  }
-  .modal-footer {
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
   .form-grid {
     grid-template-columns: 1fr !important;
