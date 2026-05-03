@@ -40,11 +40,20 @@
   color: var(--ink-0);
 }
 
+/* form inside modal-card must join the flex chain */
+.modal-card > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-body {
   padding: 20px 24px;
   overflow-y: auto;
   flex: 1;
-  min-height: 0; /* allows flex item to shrink so footer stays visible */
+  min-height: 0;
 }
 
 .modal-footer {
