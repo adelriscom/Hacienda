@@ -88,13 +88,13 @@ export default function Dashboard() {
       const cur  = txs.filter(t => t.occurred_at >= curStart && t.occurred_at < curEnd)
       const prev = txs.filter(t => t.occurred_at >= prevStart && t.occurred_at < curStart)
 
-      const income   = cur.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
-      const expenses = cur.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
-      const prevExp  = prev.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+      const income   = cur.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0)
+      const expenses = cur.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
+      const prevExp  = prev.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
       const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
       const catMap = {}
-      cur.filter(t => t.amount < 0 && t.category).forEach(t => {
+      cur.filter(t => t.amount < 0 && t.type !== 'transfer' && t.category).forEach(t => {
         const k = t.category.name
         if (!catMap[k]) catMap[k] = { name: k, color: t.category.color || '#94a3b8', amount: 0 }
         catMap[k].amount += Math.abs(t.amount)
@@ -112,13 +112,13 @@ export default function Dashboard() {
         const mTxs = txs.filter(t => t.occurred_at >= ms && t.occurred_at < me)
         months.push({
           label:    fmtMonthShort(ym),
-          income:   mTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
-          expenses: mTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
+          income:   mTxs.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0),
+          expenses: mTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0),
           current:  i === 0,
         })
       }
 
-      setStats({ income, expenses, expDelta, categories, months, txCount: cur.length })
+      setStats({ income, expenses, expDelta, categories, months, txCount: cur.filter(t => t.type !== 'transfer').length })
       setLoading(false)
     }
     load()
