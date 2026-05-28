@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
+import { useHousehold } from '../lib/household'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-function initForm(tx) {
+function initForm(tx, defaultPerson = 'Alexander') {
   if (!tx) return {
     occurred_at: today(), description: '', amount: '', type: 'expense',
-    account_id: '', category_id: '', person: 'Alexander',
+    account_id: '', category_id: '', person: defaultPerson,
     notes: '', is_recurring: false, status: 'match',
   }
   return {
@@ -19,7 +20,7 @@ function initForm(tx) {
     type:         tx.type || 'expense',
     account_id:   tx.account_id || '',
     category_id:  tx.category_id || '',
-    person:       tx.person || 'Alexander',
+    person:       tx.person || defaultPerson,
     notes:        tx.notes || '',
     is_recurring: tx.is_recurring || false,
     status:       tx.status || 'review',
@@ -30,9 +31,10 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { t } = useTranslation()
+  const { myName } = useHousehold()
   const isEdit = !!transaction
 
-  const [form, setForm]       = useState(() => ({ ...initForm(transaction), ...defaults }))
+  const [form, setForm]       = useState(() => ({ ...initForm(transaction, myName || 'Alexander'), ...defaults }))
   const [saving, setSaving]   = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
