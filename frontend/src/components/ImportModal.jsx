@@ -17,6 +17,19 @@ function matchName(name, list) {
   return list.find(item => item.name.toLowerCase() === n) || null
 }
 
+function inferAccount(name) {
+  const n = name.toLowerCase()
+  const isCOP = /davivienda|bancolombia|occidente|colpensiones|propulsar|nequi|banco de/.test(n)
+  const currency = isCOP ? 'COP' : 'CAD'
+  let type = 'checking'
+  if (/visa|mastercard|credit|costco|\btc\b|tarjeta/.test(n)) type = 'credit'
+  else if (/rrsp/.test(n))                                     type = 'savings'
+  else if (/tfsa|afc|ahorro|saving/.test(n))                   type = 'savings'
+  else if (/investment|propulsar|colpensiones/.test(n))        type = 'investment'
+  else if (/cash|efectivo/.test(n))                            type = 'cash'
+  return { currency, type }
+}
+
 function parseDate(raw) {
   if (typeof raw === 'number' && raw > 40000) return serialToISO(raw) + 'T12:00:00'
   const s = String(raw).trim()
@@ -156,20 +169,22 @@ function parseSheet(ws, categories, accounts) {
       })
   }
 
-  let catMatched = 0, catUnmatched = 0
+  let catMatched = 0, catUnmatched = 0, acctMatched = 0, acctNew = 0
   const resolved = parsed.map(r => {
     const cat  = matchName(r.category_name, categories)
     const acct = matchName(r.account_name, accounts)
     if (r.category_name) { cat ? catMatched++ : catUnmatched++ }
+    if (r.account_name)  { acct ? acctMatched++ : acctNew++ }
     return {
       ...r,
       category_id:       cat?.id  || null,
       _resolved_acct_id: acct?.id || null,
       _cat_warn:         !!r.category_name && !cat,
+      _acct_new:         !!r.account_name  && !acct,
     }
   })
 
-  return { rows: resolved, isSheet1, catMatched, catUnmatched, detectedHeaders }
+  return { rows: resolved, isSheet1, catMatched, catUnmatched, acctMatched, acctNew, detectedHeaders }
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -193,6 +208,7 @@ export default function ImportModal({ onClose, onSave }) {
   const [error, setError]           = useState(null)
   const [dupCount, setDupCount]     = useState(0)
   const [skipDups, setSkipDups]     = useState(true)
+  const [newAcctNames, setNewAcctNames] = useState([])
   const fileRef = useRef()
 
   const cadAccounts = accounts.filter(a => a.currency === 'CAD')
@@ -249,6 +265,9 @@ export default function ImportModal({ onClose, onSave }) {
       }))
       dups = taggedRows.filter(r => r._isDup).length
     }
+    const unmatchedAccts = [...new Set(
+      result.rows.filter(r => r._acct_new).map(r => r.account_name).filter(Boolean)
+    )]
     // Set all state together after the await so React batches into one render
     // and the preview table never sees preview=null while step='preview'
     setSelectedSheet(sheetName)
@@ -257,6 +276,7 @@ export default function ImportModal({ onClose, onSave }) {
     setPreview(taggedRows.slice(0, 15))
     setDupCount(dups)
     setSkipDups(dups > 0)
+    setNewAcctNames(unmatchedAccts)
     setStep('preview')
   }
 
@@ -283,11 +303,26 @@ export default function ImportModal({ onClose, onSave }) {
       let catMap = {}
       if (unmatchedNames.length > 0) catMap = await ensureCategories(unmatchedNames)
 
+      // Auto-create accounts that were detected in the file but don't exist yet
+      let newAcctMap = {}
+      if (newAcctNames.length > 0) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const user_id = session?.user?.id
+        const { data: created, error: acctErr } = await supabase
+          .from('accounts')
+          .insert(newAcctNames.map(name => ({ user_id, name, ...inferAccount(name), balance: 0, is_active: true })))
+          .select()
+        if (acctErr) throw acctErr
+        ;(created || []).forEach(a => { newAcctMap[a.name.toLowerCase()] = a.id })
+      }
+
       const VALID_PERSONS = new Set(['Alexander', 'Marcela', 'Shared'])
-      const toInsert = activeRows.map(({ _cat_warn, _isDup, _resolved_acct_id, category_name, account_name, ...r }) => ({
+      const toInsert = activeRows.map(({ _cat_warn, _acct_new, _isDup, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
         category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
-        account_id:  _resolved_acct_id || defaultAcct || null,
+        account_id:  _resolved_acct_id
+                     || (account_name ? newAcctMap[account_name.toLowerCase()] : null)
+                     || defaultAcct || null,
         person:      VALID_PERSONS.has(r.person) ? r.person : defaultPerson,
       }))
       await onSave(toInsert)
@@ -303,7 +338,7 @@ export default function ImportModal({ onClose, onSave }) {
     setStep('upload'); setWb(null); setRows(null); setPreview(null)
     setStats(null); setError(null); setSheetNames([]); setSelectedSheet('')
     setDefaultAcct(''); setDefaultPerson('Alexander')
-    setDupCount(0); setSkipDups(true)
+    setDupCount(0); setSkipDups(true); setNewAcctNames([])
   }
 
   return (
@@ -397,6 +432,36 @@ export default function ImportModal({ onClose, onSave }) {
                 </div>
               )}
             </div>
+
+            {/* Auto-create accounts banner */}
+            {newAcctNames.length > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px',
+                background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)',
+                borderRadius: 8, marginBottom: 14,
+              }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>✦</span>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-1)', flex: 1 }}>
+                  <strong style={{ color: 'var(--accent)' }}>
+                    {newAcctNames.length} new account{newAcctNames.length > 1 ? 's' : ''} will be created automatically:
+                  </strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    {newAcctNames.map(name => {
+                      const { currency, type } = inferAccount(name)
+                      return (
+                        <span key={name} style={{
+                          padding: '2px 8px', borderRadius: 6, fontSize: 11.5,
+                          background: 'rgba(99,102,241,.15)', color: 'var(--accent)',
+                          border: '1px solid rgba(99,102,241,.3)',
+                        }}>
+                          {name} <span style={{ opacity: 0.7 }}>· {currency} · {type}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Duplicate warning */}
             {dupCount > 0 && (
