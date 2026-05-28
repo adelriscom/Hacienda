@@ -375,7 +375,8 @@ export default function Transactions({ type }) {
                 <TxRow key={tx.id} t={tx}
                   selected={selectedIds.has(tx.id)}
                   onToggle={() => toggleSelect(tx.id)}
-                  onEdit={setEditingTx} />
+                  onEdit={setEditingTx}
+                  onStatusToggle={(id, status) => updateTransaction(id, { status })} />
               ))
         }
       </div>
@@ -408,13 +409,17 @@ function CoverageItem({ label, bar, color, num }) {
   )
 }
 
-function TxRow({ t: tx, selected, onToggle, onEdit }) {
+function TxRow({ t: tx, selected, onToggle, onEdit, onStatusToggle }) {
   const { t } = useTranslation()
   const isGhost  = tx.status === 'ghost'
   const isReview = tx.status === 'review'
   const d = new Date(tx.occurred_at)
   const dateStr = d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
   const timeStr = d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false })
+
+  const canToggleStatus = tx.status === 'review' || tx.status === 'match'
+  const nextStatus      = tx.status === 'review' ? 'match' : 'review'
+  const statusTitle     = tx.status === 'review' ? 'Mark as cleared' : tx.status === 'match' ? 'Mark as to review' : undefined
 
   return (
     <div className={`tx-row ${isGhost ? 'ghost-row-tx' : ''} ${isReview ? 'review-row-tx' : ''} ${selected ? 'tx-row-selected' : ''}`}
@@ -441,9 +446,16 @@ function TxRow({ t: tx, selected, onToggle, onEdit }) {
         )}
       </div>
       <div className="tx-col-acct">{tx.account?.name}</div>
-      <div className="tx-col-tag">
+      <div className="tx-col-tag" onClick={e => e.stopPropagation()}>
         {tx.tag && (
-          <span className={`chip tag-${tx.tag.kind}`}>
+          <span
+            className={`chip tag-${tx.tag.kind}`}
+            title={statusTitle}
+            style={{ cursor: canToggleStatus ? 'pointer' : 'default' }}
+            onClick={() => canToggleStatus && onStatusToggle(tx.id, nextStatus)}
+            onMouseEnter={e => { if (canToggleStatus) e.currentTarget.style.opacity = '0.7' }}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
             {tx.tag.kind === 'ghost'  && <Icon name="ghost"  size={10} />}
             {tx.tag.kind === 'warn'   && <Icon name="review" size={10} />}
             {tx.tag.kind === 'ok'     && <Icon name="check"  size={10} />}
