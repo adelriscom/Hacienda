@@ -5,6 +5,7 @@ import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
 import { useBudgets } from '../hooks/useBudgets'
 import { useCategories } from '../hooks/useCategories'
+import { useExchangeRate } from '../hooks/useExchangeRate'
 
 function nowMonth() {
   const now = new Date()
@@ -22,28 +23,61 @@ function shiftMonth(ym, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function fmtCAD(n) {
+  return n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`
+}
+
+function fmtCOP(n) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M COP`
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(0)}k COP`
+  return `${n.toLocaleString('en-CA', { maximumFractionDigits: 0 })} COP`
+}
+
+function fmt(n, currency) {
+  return currency === 'COP' ? fmtCOP(n) : fmtCAD(n)
+}
+
 export default function Budgets() {
   const { t } = useTranslation()
   const [filterMonth, setFilterMonth] = useState(nowMonth)
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing]         = useState(null)
+  const [editingRate, setEditingRate] = useState(false)
+  const [rateInput, setRateInput]     = useState('')
 
   const { budgets, spending, loading, addBudget, updateBudget, deleteBudget } = useBudgets(filterMonth)
   const { categories } = useCategories()
+  const { rate: copToCAD, saveRate } = useExchangeRate(filterMonth)
 
-  const totalBudget  = budgets.reduce((s, b) => s + b.amount, 0)
-  const totalSpent   = budgets.reduce((s, b) => s + (spending[b.category_id] || 0), 0)
-  const totalLeft    = totalBudget - totalSpent
+  // Totals — everything converted to CAD
+  const totalBudgetCAD = budgets.reduce((s, b) => {
+    return s + (b.currency === 'COP' ? b.amount * copToCAD : b.amount)
+  }, 0)
+  const totalSpentCAD = budgets.reduce((s, b) => {
+    const sp = spending[b.category_id] || { CAD: 0, COP: 0 }
+    return s + sp.CAD + sp.COP * copToCAD
+  }, 0)
+  const totalLeftCAD = totalBudgetCAD - totalSpentCAD
 
-  const now     = new Date()
-  const daysIn  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-  const dayNum  = filterMonth === nowMonth() ? now.getDate() : daysIn
+  const now      = new Date()
+  const daysIn   = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const dayNum   = filterMonth === nowMonth() ? now.getDate() : daysIn
   const monthPct = Math.round((dayNum / daysIn) * 100)
-  const spentPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  const spentPct = totalBudgetCAD > 0 ? Math.round((totalSpentCAD / totalBudgetCAD) * 100) : 0
 
-  const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toLocaleString('en-CA', { maximumFractionDigits: 0 })}`
+  const hasCOP = budgets.some(b => b.currency === 'COP')
 
   const budgetedCatIds = new Set(budgets.map(b => b.category_id))
   const availableCats  = categories.filter(c => !budgetedCatIds.has(c.id))
+
+  function startEditRate() {
+    setRateInput(Math.round(1 / copToCAD).toString())
+    setEditingRate(true)
+  }
+  async function commitRate() {
+    const cadPerCOP = parseFloat(rateInput)
+    if (cadPerCOP > 0) await saveRate(1 / cadPerCOP)
+    setEditingRate(false)
+  }
 
   return (
     <>
@@ -66,14 +100,46 @@ export default function Budgets() {
         <div className="budget-overview card">
           <div className="bo-left">
             <div className="card-title">{t('budget.totalBudget')}</div>
-            <div className="num num-hero">{fmtK(totalBudget)}</div>
+            <div className="num num-hero">{fmtCAD(totalBudgetCAD)}</div>
             <div className="bo-meta">
-              <span>{t('budget.spent')} <span className="num pos-text">{fmtK(totalSpent)}</span></span>
+              <span>{t('budget.spent')} <span className="num pos-text">{fmtCAD(totalSpentCAD)}</span></span>
               <span className="hero-pip" />
-              <span>{t('budget.remaining')} <span className="num">{fmtK(Math.max(totalLeft, 0))}</span></span>
+              <span>{t('budget.remaining')} <span className="num">{fmtCAD(Math.max(totalLeftCAD, 0))}</span></span>
               <span className="hero-pip" />
               <span>{t('budget.today', { day: dayNum })}</span>
             </div>
+
+            {/* Exchange rate editor — only visible when COP budgets exist */}
+            {hasCOP && (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                <span>1 CAD =</span>
+                {editingRate ? (
+                  <>
+                    <input
+                      type="number" value={rateInput} min="1"
+                      onChange={e => setRateInput(e.target.value)}
+                      onBlur={commitRate}
+                      onKeyDown={e => e.key === 'Enter' && commitRate()}
+                      autoFocus
+                      style={{ width: 80, fontSize: 12, padding: '2px 6px', borderRadius: 6,
+                        border: '1px solid var(--accent)', background: 'var(--bg-2)',
+                        color: 'var(--ink-0)', outline: 'none' }}
+                    />
+                    <span>COP</span>
+                  </>
+                ) : (
+                  <button
+                    onClick={startEditRate}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      color: 'var(--ink-2)', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <span className="num">{Math.round(1 / copToCAD).toLocaleString('en-CA')}</span>
+                    <span>COP</span>
+                    <Icon name="edit" size={10} />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="bo-right">
             <div className="pace-track">
@@ -99,13 +165,17 @@ export default function Budgets() {
         <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)' }}>{t('budget.loading')}</div>
       ) : (
         <div className="envelope-grid">
-          {budgets.map(b => (
-            <Envelope key={b.id}
-              budget={b}
-              spent={spending[b.category_id] || 0}
-              onEdit={() => setEditing(b)}
-              t={t} />
-          ))}
+          {budgets.map(b => {
+            const sp = spending[b.category_id] || { CAD: 0, COP: 0 }
+            const spent = sp[b.currency] || 0
+            return (
+              <Envelope key={b.id}
+                budget={b}
+                spent={spent}
+                onEdit={() => setEditing(b)}
+                t={t} />
+            )
+          })}
           {availableCats.length > 0 && (
             <div className="envelope envelope-add" onClick={() => setEditing('new')}>
               <Icon name="plus" size={18} />
@@ -125,9 +195,9 @@ export default function Budgets() {
           budget={editing === 'new' ? null : editing}
           categories={editing === 'new' ? availableCats : categories}
           onClose={() => setEditing(null)}
-          onSave={async ({ category_id, amount }) => {
-            if (editing === 'new') await addBudget(category_id, amount)
-            else await updateBudget(editing.id, amount)
+          onSave={async ({ category_id, amount, currency }) => {
+            if (editing === 'new') await addBudget(category_id, amount, currency)
+            else await updateBudget(editing.id, amount, currency)
             setEditing(null)
           }}
           onDelete={async () => {
@@ -142,13 +212,13 @@ export default function Budgets() {
 }
 
 function Envelope({ budget: b, spent, onEdit, t }) {
-  const rawPct  = b.amount > 0 ? (spent / b.amount) * 100 : 0
-  const pct     = Math.min(rawPct, 120)
-  const over    = spent > b.amount
-  const warning = !over && rawPct >= 80
-  const mPct    = monthPctNow()
-  const ahead   = !over && rawPct > mPct + 10
-  const color   = b.category?.color || 'var(--accent)'
+  const rawPct   = b.amount > 0 ? (spent / b.amount) * 100 : 0
+  const pct      = Math.min(rawPct, 120)
+  const over     = spent > b.amount
+  const warning  = !over && rawPct >= 80
+  const mPct     = monthPctNow()
+  const ahead    = !over && rawPct > mPct + 10
+  const color    = b.category?.color || 'var(--accent)'
   const barColor = over ? 'var(--neg)' : warning ? 'var(--warn)' : color
 
   const chipClass = over ? 'tag-warn' : warning ? 'tag-warn' : ahead ? '' : 'tag-ok'
@@ -167,15 +237,22 @@ function Envelope({ budget: b, spent, onEdit, t }) {
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
         </div>
         <div className="env-name">{b.category?.name || '—'}</div>
+        {b.currency === 'COP' && (
+          <span style={{
+            fontSize: 9.5, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+            background: 'rgba(20,184,166,.15)', color: '#14b8a6',
+            border: '1px solid rgba(20,184,166,.3)', marginLeft: 4, flexShrink: 0,
+          }}>COP</span>
+        )}
         <button className="icon-btn sm-btn" style={{ marginLeft: 'auto' }} onClick={onEdit}>
           <Icon name="more" size={12} />
         </button>
       </div>
       <div className="env-amt">
         <span className="num num-md" style={{ color: over ? 'var(--neg)' : warning ? 'var(--warn)' : undefined }}>
-          ${spent.toLocaleString('en-CA', { maximumFractionDigits: 0 })}
+          {fmt(spent, b.currency)}
         </span>
-        <span className="env-of">/ ${b.amount.toLocaleString('en-CA', { maximumFractionDigits: 0 })}</span>
+        <span className="env-of">/ {fmt(b.amount, b.currency)}</span>
       </div>
       <div className="env-bar">
         <div className="env-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
@@ -197,17 +274,18 @@ function monthPctNow() {
 }
 
 function BudgetModal({ budget, categories, onClose, onSave, onDelete, t }) {
-  const [catId,   setCatId]   = useState(budget?.category_id || '')
-  const [amount,  setAmount]  = useState(budget?.amount ? String(budget.amount) : '')
-  const [saving,  setSaving]  = useState(false)
-  const [delStep, setDelStep] = useState(0)
-  const [error,   setError]   = useState(null)
+  const [catId,    setCatId]    = useState(budget?.category_id || '')
+  const [amount,   setAmount]   = useState(budget?.amount ? String(budget.amount) : '')
+  const [currency, setCurrency] = useState(budget?.currency || 'CAD')
+  const [saving,   setSaving]   = useState(false)
+  const [delStep,  setDelStep]  = useState(0)
+  const [error,    setError]    = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!catId || !amount) { setError(t('budget.modal.required')); return }
     setSaving(true); setError(null)
-    try { await onSave({ category_id: catId, amount }) }
+    try { await onSave({ category_id: catId, amount, currency }) }
     catch (err) { setError(err.message); setSaving(false) }
   }
 
@@ -236,8 +314,25 @@ function BudgetModal({ budget, categories, onClose, onSave, onDelete, t }) {
               )}
             </div>
 
-            <div className="form-field span-2">
-              <label>{t('budget.modal.amount')}</label>
+            <div className="form-field">
+              <label>Currency</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['CAD', 'COP'].map(c => (
+                  <button key={c} type="button"
+                    style={{
+                      flex: 1, height: 34, borderRadius: 8, border: '1px solid',
+                      borderColor: currency === c ? 'var(--accent)' : 'var(--border)',
+                      background:  currency === c ? 'rgba(99,102,241,.12)' : 'var(--bg-2)',
+                      color:       currency === c ? 'var(--accent)' : 'var(--ink-2)',
+                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    }}
+                    onClick={() => setCurrency(c)}>{c}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label>{t('budget.modal.amount')} <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>({currency})</span></label>
               <input type="number" step="0.01" min="0" placeholder="0.00"
                 value={amount} onChange={e => setAmount(e.target.value)} required />
             </div>
