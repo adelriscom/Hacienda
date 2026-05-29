@@ -44,9 +44,9 @@ export default function Categories() {
         <CategoryModal
           category={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
-          onSave={async ({ name, color }) => {
-            if (editing === 'new') await addCategory(name, color)
-            else await updateCategory(editing.id, { name: name.trim(), color })
+          onSave={async ({ name, color, is_tax_deductible, tax_line }) => {
+            if (editing === 'new') await addCategory(name, color, is_tax_deductible, tax_line)
+            else await updateCategory(editing.id, { name: name.trim(), color, is_tax_deductible, tax_line })
             setEditing(null)
           }}
           onDelete={async (id) => {
@@ -85,6 +85,12 @@ function CategoryCard({ category: c, onEdit, t }) {
         }}>
           {c.name}
         </div>
+        {c.is_tax_deductible && (
+          <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>🍁</span>
+            <span>{c.tax_line || t('cat.taxDeductible')}</span>
+          </div>
+        )}
       </div>
       <button className="icon-btn sm-btn" title={t('cat.modal.titleEdit')} onClick={() => onEdit(c)}>
         <Icon name="edit" size={14} />
@@ -93,19 +99,26 @@ function CategoryCard({ category: c, onEdit, t }) {
   )
 }
 
+const TAX_LINES = [
+  'Medical', 'Donations', 'Home Office', 'Childcare',
+  'Professional Dues', 'Moving', 'Other',
+]
+
 function CategoryModal({ category, onClose, onSave, onDelete, t }) {
-  const [name,    setName]    = useState(category?.name  || '')
-  const [color,   setColor]   = useState(category?.color || PRESET_COLORS[0])
-  const [saving,  setSaving]  = useState(false)
-  const [delStep, setDelStep] = useState(0)
-  const [error,   setError]   = useState(null)
+  const [name,       setName]       = useState(category?.name              || '')
+  const [color,      setColor]      = useState(category?.color             || PRESET_COLORS[0])
+  const [isTax,      setIsTax]      = useState(category?.is_tax_deductible || false)
+  const [taxLine,    setTaxLine]    = useState(category?.tax_line          || '')
+  const [saving,     setSaving]     = useState(false)
+  const [delStep,    setDelStep]    = useState(0)
+  const [error,      setError]      = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) { setError(t('cat.modal.required')); return }
     setSaving(true); setError(null)
     try {
-      await onSave({ name, color })
+      await onSave({ name, color, is_tax_deductible: isTax, tax_line: isTax ? (taxLine || null) : null })
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -161,6 +174,29 @@ function CategoryModal({ category, onClose, onSave, onDelete, t }) {
                 </span>
               </div>
             </div>
+
+            <div className="form-field span-2">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={isTax}
+                  onChange={e => { setIsTax(e.target.checked); if (!e.target.checked) setTaxLine('') }}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span>🍁 {t('cat.taxDeductible')}</span>
+              </label>
+            </div>
+
+            {isTax && (
+              <div className="form-field span-2">
+                <label>{t('cat.taxLine')}</label>
+                <select value={taxLine} onChange={e => setTaxLine(e.target.value)}
+                  style={{ width: '100%' }}>
+                  <option value="">— {t('cat.taxLineSelect')} —</option>
+                  {TAX_LINES.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            )}
 
           </div>
           {error && <p style={{ color: 'var(--neg)', fontSize: 12, marginTop: 12 }}>{error}</p>}

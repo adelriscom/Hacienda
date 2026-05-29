@@ -106,7 +106,14 @@
     "personTitle": "Gastos por persona",
     "monthlyTable": "Resumen mensual",
     "last6": "Últimos 6 meses",
-    "month": "Mes"
+    "month": "Mes",
+    "taxTitle": "Resumen deducible de impuestos",
+    "taxSub": "Categorías marcadas · Declaración anual",
+    "taxLine": "Línea fiscal",
+    "taxAmount": "Total",
+    "taxTotal": "Total deducible",
+    "taxEmpty": "Aún no hay categorías deducibles. Márcalas en la pantalla de Categorías.",
+    "taxNote": "Solo informativo. Consulta un contador para tu declaración."
   },
   "cal": {
     "title": "Calendario",
@@ -198,6 +205,9 @@
     "addBtn": "Agregar categoría",
     "loading": "Cargando…",
     "empty": "Sin categorías. Haz clic en «Agregar categoría» para comenzar.",
+    "taxDeductible": "Deducible de impuestos",
+    "taxLine": "Línea fiscal",
+    "taxLineSelect": "Seleccionar línea fiscal",
     "modal": {
       "titleNew": "Nueva categoría",
       "titleEdit": "Editar categoría",

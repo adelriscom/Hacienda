@@ -107,7 +107,14 @@
     "personTitle": "Spending by person",
     "monthlyTable": "Monthly summary",
     "last6": "Last 6 months",
-    "month": "Month"
+    "month": "Month",
+    "taxTitle": "Tax Deductible Summary",
+    "taxSub": "Flagged categories · T1 filing",
+    "taxLine": "Tax Line",
+    "taxAmount": "Total",
+    "taxTotal": "Total Deductible",
+    "taxEmpty": "No tax-deductible categories set up yet. Flag categories in the Categories screen.",
+    "taxNote": "For informational purposes only. Consult a tax professional for filing."
   },
   "cal": {
     "title": "Calendar",
@@ -199,6 +206,9 @@
     "addBtn": "Add category",
     "loading": "Loading…",
     "empty": "No categories yet. Click «Add category» to get started.",
+    "taxDeductible": "Tax deductible",
+    "taxLine": "Tax line",
+    "taxLineSelect": "Select tax line",
     "modal": {
       "titleNew": "New category",
       "titleEdit": "Edit category",

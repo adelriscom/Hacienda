@@ -6,17 +6,17 @@ export function useCategories() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('categories').select('*').order('name')
+    const { data } = await supabase.from('categories').select('id,user_id,name,color,icon,is_tax_deductible,tax_line,created_at').order('name')
     setCategories(data || [])
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  async function addCategory(name, color) {
+  async function addCategory(name, color, is_tax_deductible = false, tax_line = null) {
     const { data: { session } } = await supabase.auth.getSession()
     const user_id = session?.user?.id
-    const { error } = await supabase.from('categories').insert([{ name: name.trim(), color, icon: '', user_id }])
+    const { error } = await supabase.from('categories').insert([{ name: name.trim(), color, icon: '', user_id, is_tax_deductible, tax_line }])
     if (error) throw error
     await load()
   }

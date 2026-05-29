@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
+import { useCategories } from '../hooks/useCategories'
 
 function nowMonth() {
   const now = new Date()
@@ -41,6 +42,10 @@ export default function Reports() {
   const [txs,     setTxs]     = useState([])
   const [loading, setLoading] = useState(true)
   const { isFamily, myUserId } = useHousehold()
+  const { categories } = useCategories()
+  const [taxYear,    setTaxYear]    = useState(() => new Date().getFullYear())
+  const [taxTxs,     setTaxTxs]     = useState([])
+  const [taxLoading, setTaxLoading] = useState(false)
 
   // Load 6 months of data centred on focusMonth (5 before + focusMonth)
   useEffect(() => {
@@ -64,6 +69,26 @@ export default function Reports() {
     }
     load()
   }, [focusMonth, isFamily, myUserId])
+
+  // Load full tax year transactions
+  useEffect(() => {
+    async function loadTax() {
+      setTaxLoading(true)
+      const start = `${taxYear}-01-01`
+      const end   = `${taxYear + 1}-01-01`
+      let query = supabase
+        .from('transactions')
+        .select('amount, type, category_id')
+        .gte('occurred_at', start)
+        .lt('occurred_at', end)
+        .eq('type', 'expense')
+      if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
+      const { data } = await query
+      setTaxTxs(data || [])
+      setTaxLoading(false)
+    }
+    loadTax()
+  }, [taxYear, isFamily, myUserId])
 
   // Focus month transactions
   const { start: fStart, end: fEnd } = monthRange(focusMonth)
@@ -130,6 +155,43 @@ export default function Reports() {
       .map(([name, amount]) => ({ name, amount, pct: total ? Math.round(amount / total * 100) : 0 }))
       .sort((a, b) => b.amount - a.amount)
   }, [focusTxs])
+
+  const taxCatMap = useMemo(() => {
+    const map = {}
+    categories.forEach(c => { if (c.is_tax_deductible) map[c.id] = c })
+    return map
+  }, [categories])
+
+  const taxBreakdown = useMemo(() => {
+    const byLine = {}
+    taxTxs.forEach(tx => {
+      const cat = taxCatMap[tx.category_id]
+      if (!cat) return
+      const line = cat.tax_line || cat.name
+      if (!byLine[line]) byLine[line] = { line, categories: {}, total: 0 }
+      if (!byLine[line].categories[cat.name]) byLine[line].categories[cat.name] = 0
+      byLine[line].categories[cat.name] += Math.abs(tx.amount)
+      byLine[line].total += Math.abs(tx.amount)
+    })
+    return Object.values(byLine).sort((a, b) => b.total - a.total)
+  }, [taxTxs, taxCatMap])
+
+  const taxTotal = taxBreakdown.reduce((s, r) => s + r.total, 0)
+
+  function exportTaxCSV() {
+    const rows = [['Tax Line', 'Category', `Total ${taxYear} (CAD)`]]
+    taxBreakdown.forEach(row => {
+      Object.entries(row.categories).forEach(([catName, amt]) => {
+        rows.push([row.line, catName, amt.toFixed(2)])
+      })
+    })
+    rows.push(['', 'TOTAL', taxTotal.toFixed(2)])
+    const csv = '﻿' + rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.download = `tax-deductible-${taxYear}.csv`
+    a.click()
+  }
 
   return (
     <>
@@ -292,6 +354,81 @@ export default function Reports() {
               </tbody>
             </table>
           </div>
+          {/* Tax deductible summary */}
+          <div className="card" style={{ gridColumn: '1 / -1' }}>
+            <div className="card-h" style={{ marginBottom: 16 }}>
+              <div>
+                <h3>🍁 {t('reports.taxTitle')}</h3>
+                <p>{t('reports.taxSub')}</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <button className="btn ghost sm" style={{ padding: '0 8px' }}
+                    onClick={() => setTaxYear(y => y - 1)}>←</button>
+                  <span style={{ fontSize: 13, fontWeight: 600, padding: '0 8px', minWidth: 44, textAlign: 'center' }}>
+                    {taxYear}
+                  </span>
+                  <button className="btn ghost sm" style={{ padding: '0 8px' }}
+                    onClick={() => setTaxYear(y => y + 1)}>→</button>
+                </div>
+                {taxBreakdown.length > 0 && (
+                  <button className="btn ghost sm" onClick={exportTaxCSV}>
+                    ↓ CSV
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {taxLoading ? (
+              <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+                {t('reports.loading')}
+              </div>
+            ) : taxBreakdown.length === 0 ? (
+              <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+                {t('reports.taxEmpty')}
+              </div>
+            ) : (
+              <>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                      <th style={{ textAlign: 'left',  padding: '6px 4px', color: 'var(--ink-3)', fontWeight: 600 }}>{t('reports.taxLine')}</th>
+                      <th style={{ textAlign: 'right', padding: '6px 4px', color: 'var(--ink-3)', fontWeight: 600 }}>{t('reports.taxAmount')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {taxBreakdown.map(row => (
+                      <tr key={row.line} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <td style={{ padding: '8px 4px' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-0)', marginBottom: 2 }}>
+                            {row.line}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                            {Object.entries(row.categories).map(([name]) => name).join(', ')}
+                          </div>
+                        </td>
+                        <td className="num" style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 600, fontSize: 13 }}>
+                          {fmt(row.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: '2px solid var(--line)', background: 'rgba(99,102,241,0.04)' }}>
+                      <td style={{ padding: '8px 4px', fontWeight: 700, fontSize: 13 }}>{t('reports.taxTotal')}</td>
+                      <td className="num" style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>
+                        {fmt(taxTotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <p style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 10 }}>
+                  {t('reports.taxNote')}
+                </p>
+              </>
+            )}
+          </div>
+
         </div>
       )}
     </>

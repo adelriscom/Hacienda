@@ -106,7 +106,14 @@
     "personTitle": "Dépenses par personne",
     "monthlyTable": "Résumé mensuel",
     "last6": "6 derniers mois",
-    "month": "Mois"
+    "month": "Mois",
+    "taxTitle": "Résumé des déductions fiscales",
+    "taxSub": "Catégories marquées · Déclaration T1",
+    "taxLine": "Ligne fiscale",
+    "taxAmount": "Total",
+    "taxTotal": "Total déductible",
+    "taxEmpty": "Aucune catégorie déductible configurée. Marquez-les dans l'écran Catégories.",
+    "taxNote": "À titre informatif uniquement. Consultez un fiscaliste pour votre déclaration."
   },
   "cal": {
     "title": "Calendrier",
@@ -198,6 +205,9 @@
     "addBtn": "Ajouter une catégorie",
     "loading": "Chargement…",
     "empty": "Aucune catégorie. Cliquez sur «Ajouter une catégorie» pour commencer.",
+    "taxDeductible": "Déductible fiscalement",
+    "taxLine": "Ligne fiscale",
+    "taxLineSelect": "Sélectionner une ligne fiscale",
     "modal": {
       "titleNew": "Nouvelle catégorie",
       "titleEdit": "Modifier la catégorie",
