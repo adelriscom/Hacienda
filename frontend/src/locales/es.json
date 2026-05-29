@@ -5,7 +5,8 @@
     "dashboard": "Dashboard", "expenses": "Gastos", "income": "Ingresos",
     "budgets": "Presupuestos", "calendar": "Calendario", "review": "Por revisar",
     "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas",
-    "categories": "Categorías", "obligations": "Obligaciones", "settings": "Ajustes"
+    "categories": "Categorías", "obligations": "Obligaciones", "settings": "Ajustes",
+    "family": "Familia"
   },
   "login": {
     "tagline": "Control familiar de finanzas",
@@ -227,6 +228,27 @@
       "confirmDelete": "Confirmar eliminación",
       "required": "El nombre es obligatorio."
     }
+  },
+  "family": {
+    "title": "Vista Familiar",
+    "loading": "Cargando…",
+    "noHousehold": "Sin hogar configurado",
+    "noHouseholdSub": "Ve a Ajustes para crear o unirte a un hogar.",
+    "notFamilyMode": "Estás en modo Personal",
+    "notFamilyModeSub": "Cambia a modo Familiar para ver la vista consolidada.",
+    "switchToFamily": "Cambiar a modo Familiar",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "net": "Neto",
+    "shared": "Gastos compartidos",
+    "household": "Hogar",
+    "trendTitle": "Tendencia de gastos por persona",
+    "trendSub": "6 meses",
+    "catTitle": "Gastos por categoría",
+    "noExpenses": "Sin gastos este mes.",
+    "monthlyTable": "Comparación mensual",
+    "last6": "Últimos 6 meses",
+    "month": "Mes"
   },
   "acct": {
     "title": "Cuentas",

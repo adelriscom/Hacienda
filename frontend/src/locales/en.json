@@ -5,7 +5,8 @@
     "dashboard": "Dashboard", "expenses": "Expenses", "income": "Income",
     "budgets": "Budgets", "calendar": "Calendar", "review": "Review",
     "reports": "Reports", "recurring": "Recurring", "accounts": "Accounts",
-    "categories": "Categories", "obligations": "Obligations", "settings": "Settings"
+    "categories": "Categories", "obligations": "Obligations", "settings": "Settings",
+    "family": "Family"
   },
   "login": {
     "tagline": "Family finance control",
@@ -228,6 +229,27 @@
       "confirmDelete": "Confirm delete",
       "required": "Name is required."
     }
+  },
+  "family": {
+    "title": "Family View",
+    "loading": "Loading…",
+    "noHousehold": "No household set up",
+    "noHouseholdSub": "Go to Settings to create or join a household.",
+    "notFamilyMode": "You're in Personal mode",
+    "notFamilyModeSub": "Switch to Family mode to see the consolidated view.",
+    "switchToFamily": "Switch to Family mode",
+    "income": "Income",
+    "expenses": "Expenses",
+    "net": "Net",
+    "shared": "Shared expenses",
+    "household": "Household",
+    "trendTitle": "Expense trend by person",
+    "trendSub": "6 months",
+    "catTitle": "Spending by category",
+    "noExpenses": "No expense data this month.",
+    "monthlyTable": "Monthly comparison",
+    "last6": "Last 6 months",
+    "month": "Month"
   },
   "acct": {
     "title": "Accounts",

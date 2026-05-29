@@ -14,6 +14,7 @@ import AccountsScreen from '../screens/Accounts'
 import CategoriesScreen from '../screens/Categories'
 import ObligationsScreen from '../screens/Obligations'
 import SettingsScreen from '../screens/Settings'
+import FamilyViewScreen from '../screens/FamilyView'
 
 const ACCENTS = {
   indigo:  { a: '#6366f1', b: '#a855f7', c: '#ec4899' },
@@ -55,6 +56,7 @@ function ShellInner() {
             <Route path="/categories"   element={<CategoriesScreen />} />
             <Route path="/obligations"  element={<ObligationsScreen />} />
             <Route path="/settings"     element={<SettingsScreen />} />
+            <Route path="/family"       element={<FamilyViewScreen />} />
           </Routes>
         </main>
       </div>

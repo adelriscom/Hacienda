@@ -28,6 +28,7 @@ export default function Sidebar() {
     { id: 'expenses',  path: '/expenses',  icon: 'expense', label: t('nav.expenses'),  badge: badge(counts.expenses) },
     { id: 'income',    path: '/income',    icon: 'income',  label: t('nav.income'),    badge: badge(counts.income) },
     { id: 'budgets',   path: '/budgets',   icon: 'budget',  label: t('nav.budgets') },
+    ...(household ? [{ id: 'family', path: '/family', icon: 'users', label: t('nav.family') }] : []),
   ]
   const tools = [
     { id: 'calendar',  path: '/calendar',  icon: 'calendar',  label: t('nav.calendar') },

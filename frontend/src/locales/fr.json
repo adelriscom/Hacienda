@@ -5,7 +5,8 @@
     "dashboard": "Tableau de bord", "expenses": "Dépenses", "income": "Revenus",
     "budgets": "Budgets", "calendar": "Calendrier", "review": "À réviser",
     "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes",
-    "categories": "Catégories", "obligations": "Obligations", "settings": "Paramètres"
+    "categories": "Catégories", "obligations": "Obligations", "settings": "Paramètres",
+    "family": "Famille"
   },
   "login": {
     "tagline": "Gestion financière familiale",
@@ -227,6 +228,27 @@
       "confirmDelete": "Confirmer la suppression",
       "required": "Le nom est obligatoire."
     }
+  },
+  "family": {
+    "title": "Vue Familiale",
+    "loading": "Chargement…",
+    "noHousehold": "Aucun foyer configuré",
+    "noHouseholdSub": "Allez dans Paramètres pour créer ou rejoindre un foyer.",
+    "notFamilyMode": "Vous êtes en mode Personnel",
+    "notFamilyModeSub": "Passez en mode Famille pour voir la vue consolidée.",
+    "switchToFamily": "Passer en mode Famille",
+    "income": "Revenus",
+    "expenses": "Dépenses",
+    "net": "Net",
+    "shared": "Dépenses partagées",
+    "household": "Foyer",
+    "trendTitle": "Tendance des dépenses par personne",
+    "trendSub": "6 mois",
+    "catTitle": "Dépenses par catégorie",
+    "noExpenses": "Aucune dépense ce mois.",
+    "monthlyTable": "Comparaison mensuelle",
+    "last6": "6 derniers mois",
+    "month": "Mois"
   },
   "acct": {
     "title": "Comptes",
