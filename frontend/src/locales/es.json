@@ -5,7 +5,7 @@
     "dashboard": "Dashboard", "expenses": "Gastos", "income": "Ingresos",
     "budgets": "Presupuestos", "calendar": "Calendario", "review": "Por revisar",
     "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas",
-    "categories": "Categorías", "obligations": "Obligaciones"
+    "categories": "Categorías", "obligations": "Obligaciones", "settings": "Ajustes"
   },
   "login": {
     "tagline": "Control familiar de finanzas",

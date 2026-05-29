@@ -13,6 +13,7 @@ import ReviewShared from '../screens/Review'
 import AccountsScreen from '../screens/Accounts'
 import CategoriesScreen from '../screens/Categories'
 import ObligationsScreen from '../screens/Obligations'
+import SettingsScreen from '../screens/Settings'
 
 const ACCENTS = {
   indigo:  { a: '#6366f1', b: '#a855f7', c: '#ec4899' },
@@ -53,6 +54,7 @@ function ShellInner() {
             <Route path="/accounts"     element={<AccountsScreen />} />
             <Route path="/categories"   element={<CategoriesScreen />} />
             <Route path="/obligations"  element={<ObligationsScreen />} />
+            <Route path="/settings"     element={<SettingsScreen />} />
           </Routes>
         </main>
       </div>

@@ -5,7 +5,7 @@
     "dashboard": "Tableau de bord", "expenses": "Dépenses", "income": "Revenus",
     "budgets": "Budgets", "calendar": "Calendrier", "review": "À réviser",
     "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes",
-    "categories": "Catégories", "obligations": "Obligations"
+    "categories": "Catégories", "obligations": "Obligations", "settings": "Paramètres"
   },
   "login": {
     "tagline": "Gestion financière familiale",

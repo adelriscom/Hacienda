@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
 import { useAuth } from './auth'
 
@@ -12,26 +12,25 @@ export function HouseholdProvider({ children }) {
     () => localStorage.getItem('hacienda_viewMode') || 'family'
   )
 
-  useEffect(() => {
+  const loadHousehold = useCallback(async () => {
     if (!session) { setHousehold(null); setMembers([]); return }
-    async function load() {
-      const { data: mine } = await supabase
-        .from('household_members')
-        .select('*, household:households(id, name)')
-        .eq('user_id', session.user.id)
-        .maybeSingle()
+    const { data: mine } = await supabase
+      .from('household_members')
+      .select('*, household:households(id, name)')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
 
-      if (!mine) return
-      setHousehold(mine.household)
+    if (!mine) { setHousehold(null); setMembers([]); return }
+    setHousehold(mine.household)
 
-      const { data: all } = await supabase
-        .from('household_members')
-        .select('*')
-        .eq('household_id', mine.household.id)
-      setMembers(all || [])
-    }
-    load()
+    const { data: all } = await supabase
+      .from('household_members')
+      .select('*')
+      .eq('household_id', mine.household.id)
+    setMembers(all || [])
   }, [session])
+
+  useEffect(() => { loadHousehold() }, [loadHousehold])
 
   function setViewMode(mode) {
     localStorage.setItem('hacienda_viewMode', mode)
@@ -47,6 +46,7 @@ export function HouseholdProvider({ children }) {
     <HouseholdContext.Provider value={{
       household, members, myName, otherMembers,
       viewMode, setViewMode, isFamily, myUserId,
+      reload: loadHousehold,
     }}>
       {children}
     </HouseholdContext.Provider>

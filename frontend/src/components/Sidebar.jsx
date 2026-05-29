@@ -37,6 +37,7 @@ export default function Sidebar() {
     { id: 'accounts',     path: '/accounts',     icon: 'account',     label: t('nav.accounts') },
     { id: 'categories',   path: '/categories',   icon: 'filter',      label: t('nav.categories') },
     { id: 'obligations',  path: '/obligations',  icon: 'trend-down',  label: t('nav.obligations') },
+    { id: 'settings',     path: '/settings',     icon: 'cog',         label: t('nav.settings') },
   ]
 
   const Item = ({ it }) => {
