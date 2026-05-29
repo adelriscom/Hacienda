@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
-import { useCategories } from '../hooks/useCategories'
+import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 
 function nowMonth() {
   const now = new Date()
@@ -128,19 +128,48 @@ export default function Reports() {
 
   const maxBar = Math.max(...trendMonths.map(m => Math.max(m.income, m.expenses)), 1)
 
-  // Category breakdown for focus month
-  const catBreakdown = useMemo(() => {
+  const catIdToCategory = useMemo(() => {
     const map = {}
-    focusTxs.filter(t => t.amount < 0 && t.category).forEach(t => {
-      const k = t.category_id
-      if (!map[k]) map[k] = { name: t.category.name, color: t.category.color || '#94a3b8', amount: 0, count: 0 }
-      map[k].amount += Math.abs(t.amount)
-      map[k].count++
+    categories.forEach(c => { map[c.id] = c })
+    return map
+  }, [categories])
+
+  // Category breakdown for focus month — grouped by parent when subcategories exist
+  const catBreakdown = useMemo(() => {
+    const { childrenOf } = buildCategoryTree(categories)
+    // Accumulate spending per leaf category
+    const leafMap = {}
+    focusTxs.filter(tx => tx.amount < 0 && tx.category).forEach(tx => {
+      const k = tx.category_id
+      if (!leafMap[k]) leafMap[k] = { name: tx.category.name, color: tx.category.color || '#94a3b8', amount: 0, count: 0, parent_id: catIdToCategory[k]?.parent_id || null }
+      leafMap[k].amount += Math.abs(tx.amount)
+      leafMap[k].count++
     })
-    const sorted = Object.values(map).sort((a, b) => b.amount - a.amount)
+
+    // Group by parent if category has a parent
+    const grouped = {} // key = parentId or catId for top-level
+    Object.entries(leafMap).forEach(([catId, data]) => {
+      const groupKey = data.parent_id || catId
+      if (!grouped[groupKey]) {
+        const parent = catIdToCategory[groupKey]
+        grouped[groupKey] = {
+          name: parent ? parent.name : data.name,
+          color: parent ? (parent.color || '#94a3b8') : data.color,
+          amount: 0, count: 0,
+          children: [],
+        }
+      }
+      grouped[groupKey].amount += data.amount
+      grouped[groupKey].count  += data.count
+      if (data.parent_id) {
+        grouped[groupKey].children.push({ name: data.name, amount: data.amount, count: data.count })
+      }
+    })
+
+    const sorted = Object.values(grouped).sort((a, b) => b.amount - a.amount)
     const total  = sorted.reduce((s, c) => s + c.amount, 0)
     return sorted.map(c => ({ ...c, pct: total ? Math.round(c.amount / total * 100) : 0 }))
-  }, [focusTxs])
+  }, [focusTxs, categories, catIdToCategory])
 
   // Person breakdown
   const personBreakdown = useMemo(() => {
@@ -277,6 +306,20 @@ export default function Reports() {
                     <div style={{ height: 5, background: 'var(--bg-3)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: `${c.pct}%`, background: c.color, borderRadius: 3, transition: 'width .4s' }} />
                     </div>
+                    {c.children && c.children.length > 0 && (
+                      <div style={{ marginLeft: 17, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {c.children.sort((a, b) => b.amount - a.amount).map(sub => (
+                          <div key={sub.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, opacity: 0.5, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>{sub.name}</span>
+                              <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{sub.count} tx</span>
+                            </div>
+                            <span className="num" style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>{fmt(sub.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -208,6 +208,10 @@
     "taxDeductible": "Deducible de impuestos",
     "taxLine": "Línea fiscal",
     "taxLineSelect": "Seleccionar línea fiscal",
+    "parent": "Categoría padre",
+    "parentNone": "— Ninguna (nivel raíz) —",
+    "addSubcategory": "Agregar subcategoría",
+    "subcategories": "subcategorías",
     "modal": {
       "titleNew": "Nueva categoría",
       "titleEdit": "Editar categoría",

@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
-import { useCategories } from '../hooks/useCategories'
+import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 
 const PRESET_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -11,15 +11,28 @@ const PRESET_COLORS = [
   '#10b981', '#06b6d4', '#0ea5e9', '#94a3b8',
 ]
 
+const TAX_LINES = [
+  'Medical', 'Donations', 'Home Office', 'Childcare',
+  'Professional Dues', 'Moving', 'Other',
+]
+
 export default function Categories() {
   const { categories, loading, addCategory, updateCategory, deleteCategory } = useCategories()
   const { t } = useTranslation()
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing] = useState(null) // null | 'new' | category obj
+  const [defaultParent, setDefaultParent] = useState(null) // pre-fill parent when clicking "Add subcategory"
+
+  const { parents, childrenOf } = useMemo(() => buildCategoryTree(categories), [categories])
+
+  function openNew(parentId = null) {
+    setDefaultParent(parentId)
+    setEditing('new')
+  }
 
   return (
     <>
       <Topbar greet={t('cat.title')} date={t('cat.subtitle', { total: categories.length })}>
-        <button className="btn primary sm" onClick={() => setEditing('new')}>
+        <button className="btn primary sm" onClick={() => openNew()}>
           <Icon name="plus" size={12} /> {t('cat.addBtn')}
         </button>
       </Topbar>
@@ -29,25 +42,53 @@ export default function Categories() {
       ) : categories.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>{t('cat.empty')}</div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: 10,
-        }}>
-          {categories.map(c => (
-            <CategoryCard key={c.id} category={c} onEdit={setEditing} t={t} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {parents.map(parent => {
+            const children = childrenOf[parent.id] || []
+            return (
+              <div key={parent.id}>
+                {/* Parent card */}
+                <CategoryCard
+                  category={parent}
+                  isParent
+                  childCount={children.length}
+                  onEdit={setEditing}
+                  onAddChild={() => openNew(parent.id)}
+                  t={t}
+                />
+                {/* Children indented below */}
+                {children.length > 0 && (
+                  <div style={{ marginLeft: 28, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {children.map(child => (
+                      <CategoryCard
+                        key={child.id}
+                        category={child}
+                        isParent={false}
+                        childCount={0}
+                        onEdit={setEditing}
+                        onAddChild={null}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
       {editing !== null && (
         <CategoryModal
           category={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-          onSave={async ({ name, color, is_tax_deductible, tax_line }) => {
-            if (editing === 'new') await addCategory(name, color, is_tax_deductible, tax_line)
-            else await updateCategory(editing.id, { name: name.trim(), color, is_tax_deductible, tax_line })
+          defaultParentId={editing === 'new' ? defaultParent : undefined}
+          parents={parents}
+          onClose={() => { setEditing(null); setDefaultParent(null) }}
+          onSave={async ({ name, color, is_tax_deductible, tax_line, parent_id }) => {
+            if (editing === 'new') await addCategory(name, color, is_tax_deductible, tax_line, parent_id || null)
+            else await updateCategory(editing.id, { name: name.trim(), color, is_tax_deductible, tax_line, parent_id: parent_id || null })
             setEditing(null)
+            setDefaultParent(null)
           }}
           onDelete={async (id) => {
             await deleteCategory(id)
@@ -60,65 +101,80 @@ export default function Categories() {
   )
 }
 
-function CategoryCard({ category: c, onEdit, t }) {
+function CategoryCard({ category: c, isParent, childCount, onEdit, onAddChild, t }) {
   return (
     <div style={{
       background: 'var(--bg-card)',
-      border: '1px solid var(--line)',
+      border: `1px solid ${isParent ? 'var(--line)' : 'var(--line)'}`,
+      borderLeft: !isParent ? `3px solid ${c.color || '#94a3b8'}` : '1px solid var(--line)',
       borderRadius: 'var(--r-md)',
-      padding: '14px 16px',
+      padding: '12px 14px',
       display: 'flex',
       alignItems: 'center',
       gap: 12,
     }}>
       <div style={{
-        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+        width: isParent ? 34 : 28, height: isParent ? 34 : 28,
+        borderRadius: isParent ? 10 : 7, flexShrink: 0,
         background: `${c.color || '#94a3b8'}22`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ width: 14, height: 14, borderRadius: '50%', background: c.color || '#94a3b8' }} />
+        <div style={{ width: isParent ? 13 : 10, height: isParent ? 13 : 10, borderRadius: '50%', background: c.color || '#94a3b8' }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          fontSize: isParent ? 13.5 : 12.5, fontWeight: isParent ? 600 : 500,
+          color: 'var(--ink-0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>
           {c.name}
+          {isParent && childCount > 0 && (
+            <span style={{ fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 400, marginLeft: 6 }}>
+              {childCount} {t('cat.subcategories')}
+            </span>
+          )}
         </div>
         {c.is_tax_deductible && (
-          <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
             <span>🍁</span>
             <span>{c.tax_line || t('cat.taxDeductible')}</span>
           </div>
         )}
       </div>
-      <button className="icon-btn sm-btn" title={t('cat.modal.titleEdit')} onClick={() => onEdit(c)}>
-        <Icon name="edit" size={14} />
-      </button>
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        {isParent && onAddChild && (
+          <button className="icon-btn sm-btn" title={t('cat.addSubcategory')} onClick={onAddChild}>
+            <Icon name="plus" size={12} />
+          </button>
+        )}
+        <button className="icon-btn sm-btn" title={t('cat.modal.titleEdit')} onClick={() => onEdit(c)}>
+          <Icon name="edit" size={14} />
+        </button>
+      </div>
     </div>
   )
 }
 
-const TAX_LINES = [
-  'Medical', 'Donations', 'Home Office', 'Childcare',
-  'Professional Dues', 'Moving', 'Other',
-]
-
-function CategoryModal({ category, onClose, onSave, onDelete, t }) {
+function CategoryModal({ category, defaultParentId, parents, onClose, onSave, onDelete, t }) {
   const [name,       setName]       = useState(category?.name              || '')
   const [color,      setColor]      = useState(category?.color             || PRESET_COLORS[0])
+  const [parentId,   setParentId]   = useState(
+    category !== null ? (category?.parent_id || '') : (defaultParentId || '')
+  )
   const [isTax,      setIsTax]      = useState(category?.is_tax_deductible || false)
   const [taxLine,    setTaxLine]    = useState(category?.tax_line          || '')
   const [saving,     setSaving]     = useState(false)
   const [delStep,    setDelStep]    = useState(0)
   const [error,      setError]      = useState(null)
 
+  // Can only set parent to a top-level category (no grandchildren)
+  const parentOptions = parents.filter(p => !p.parent_id && (!category || p.id !== category.id))
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim()) { setError(t('cat.modal.required')); return }
     setSaving(true); setError(null)
     try {
-      await onSave({ name, color, is_tax_deductible: isTax, tax_line: isTax ? (taxLine || null) : null })
+      await onSave({ name, color, is_tax_deductible: isTax, tax_line: isTax ? (taxLine || null) : null, parent_id: parentId || null })
     } catch (err) {
       setError(err.message)
       setSaving(false)
@@ -142,6 +198,16 @@ function CategoryModal({ category, onClose, onSave, onDelete, t }) {
               <label>{t('cat.modal.name')}</label>
               <input type="text" placeholder={t('cat.modal.namePlaceholder')}
                 value={name} onChange={e => { setName(e.target.value); setDelStep(0) }} required />
+            </div>
+
+            <div className="form-field span-2">
+              <label>{t('cat.parent')}</label>
+              <select value={parentId} onChange={e => setParentId(e.target.value)}>
+                <option value="">{t('cat.parentNone')}</option>
+                {parentOptions.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="form-field span-2">

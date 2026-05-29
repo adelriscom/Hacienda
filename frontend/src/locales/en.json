@@ -209,6 +209,10 @@
     "taxDeductible": "Tax deductible",
     "taxLine": "Tax line",
     "taxLineSelect": "Select tax line",
+    "parent": "Parent category",
+    "parentNone": "— None (top-level) —",
+    "addSubcategory": "Add subcategory",
+    "subcategories": "subcategories",
     "modal": {
       "titleNew": "New category",
       "titleEdit": "Edit category",

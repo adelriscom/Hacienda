@@ -6,17 +6,17 @@ export function useCategories() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('categories').select('id,user_id,name,color,icon,is_tax_deductible,tax_line,created_at').order('name')
+    const { data } = await supabase.from('categories').select('id,user_id,name,color,icon,is_tax_deductible,tax_line,parent_id,created_at').order('name')
     setCategories(data || [])
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  async function addCategory(name, color, is_tax_deductible = false, tax_line = null) {
+  async function addCategory(name, color, is_tax_deductible = false, tax_line = null, parent_id = null) {
     const { data: { session } } = await supabase.auth.getSession()
     const user_id = session?.user?.id
-    const { error } = await supabase.from('categories').insert([{ name: name.trim(), color, icon: '', user_id, is_tax_deductible, tax_line }])
+    const { error } = await supabase.from('categories').insert([{ name: name.trim(), color, icon: '', user_id, is_tax_deductible, tax_line, parent_id }])
     if (error) throw error
     await load()
   }
@@ -56,4 +56,21 @@ export function useCategories() {
   }
 
   return { categories, loading, addCategory, updateCategory, deleteCategory, ensureCategories }
+}
+
+// Returns { parents, childrenOf, leafCategories }
+// parents       — top-level categories (no parent_id)
+// childrenOf    — { [parentId]: Category[] }
+// leafCategories — categories with no children (selectable in transactions/budgets)
+export function buildCategoryTree(categories) {
+  const childrenOf = {}
+  categories.forEach(c => {
+    if (c.parent_id) {
+      if (!childrenOf[c.parent_id]) childrenOf[c.parent_id] = []
+      childrenOf[c.parent_id].push(c)
+    }
+  })
+  const parents        = categories.filter(c => !c.parent_id)
+  const leafCategories = categories.filter(c => !childrenOf[c.id])
+  return { parents, childrenOf, leafCategories }
 }

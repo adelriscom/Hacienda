@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
 import { useBudgets } from '../hooks/useBudgets'
-import { useCategories } from '../hooks/useCategories'
+import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 import { useExchangeRate } from '../hooks/useExchangeRate'
 
 function nowMonth() {
@@ -66,8 +66,9 @@ export default function Budgets() {
 
   const hasCOP = budgets.some(b => b.currency === 'COP')
 
+  const { leafCategories } = useMemo(() => buildCategoryTree(categories), [categories])
   const budgetedCatIds = new Set(budgets.map(b => b.category_id))
-  const availableCats  = categories.filter(c => !budgetedCatIds.has(c.id))
+  const availableCats  = leafCategories.filter(c => !budgetedCatIds.has(c.id))
 
   function startEditRate() {
     setRateInput(Math.round(1 / copToCAD).toString())
@@ -193,7 +194,8 @@ export default function Budgets() {
       {editing !== null && (
         <BudgetModal
           budget={editing === 'new' ? null : editing}
-          categories={editing === 'new' ? availableCats : categories}
+          categories={categories}
+          budgetedCatIds={budgetedCatIds}
           onClose={() => setEditing(null)}
           onSave={async ({ category_id, amount, currency }) => {
             if (editing === 'new') await addBudget(category_id, amount, currency)
@@ -273,7 +275,7 @@ function monthPctNow() {
   return (now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()) * 100
 }
 
-function BudgetModal({ budget, categories, onClose, onSave, onDelete, t }) {
+function BudgetModal({ budget, categories, budgetedCatIds = new Set(), onClose, onSave, onDelete, t }) {
   const [catId,    setCatId]    = useState(budget?.category_id || '')
   const [amount,   setAmount]   = useState(budget?.amount ? String(budget.amount) : '')
   const [currency, setCurrency] = useState(budget?.currency || 'CAD')
@@ -309,7 +311,23 @@ function BudgetModal({ budget, categories, onClose, onSave, onDelete, t }) {
               ) : (
                 <select value={catId} onChange={e => { setCatId(e.target.value); setDelStep(0) }} required>
                   <option value="">{t('budget.modal.categorySelect')}</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {(() => {
+                    const { parents: ps, childrenOf: co } = buildCategoryTree(categories)
+                    return ps.map(parent => {
+                      const children = (co[parent.id] || []).filter(c => !budgetedCatIds.has(c.id))
+                      const isLeaf = !co[parent.id]
+                      if (!isLeaf) {
+                        if (children.length === 0) return null
+                        return (
+                          <optgroup key={parent.id} label={parent.name}>
+                            {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </optgroup>
+                        )
+                      }
+                      if (budgetedCatIds.has(parent.id)) return null
+                      return <option key={parent.id} value={parent.id}>{parent.name}</option>
+                    })
+                  })()}
                 </select>
               )}
             </div>

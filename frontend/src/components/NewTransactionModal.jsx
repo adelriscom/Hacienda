@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import { useAccounts } from '../hooks/useAccounts'
-import { useCategories } from '../hooks/useCategories'
+import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 import { useHousehold } from '../lib/household'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -87,6 +87,8 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
 
   const cadAccounts = accounts.filter(a => a.currency === 'CAD' && a.is_active)
   const copAccounts = accounts.filter(a => a.currency === 'COP' && a.is_active)
+
+  const { parents, childrenOf, leafCategories } = useMemo(() => buildCategoryTree(categories), [categories])
 
   const types = [
     ['expense', t('newTx.expense')],
@@ -177,7 +179,17 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
               <label>{t('newTx.category')}</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)}>
                 <option value="">{t('newTx.categorySelect')}</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {parents.map(parent => {
+                  const children = childrenOf[parent.id]
+                  if (children && children.length > 0) {
+                    return (
+                      <optgroup key={parent.id} label={parent.name}>
+                        {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </optgroup>
+                    )
+                  }
+                  return <option key={parent.id} value={parent.id}>{parent.name}</option>
+                })}
               </select>
             </div>
 
