@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
@@ -13,11 +14,10 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { t } = useTranslation()
-  useTheme() // ensures theme is applied on initial render
+  useTheme()
 
-  const email    = session?.user?.email ?? ''
-  const initials = email.slice(0, 2).toUpperCase()
-  const counts   = useSidebarCounts()
+  const email  = session?.user?.email ?? ''
+  const counts = useSidebarCounts()
   const { household, members, myName, viewMode, setViewMode, isFamily } = useHousehold()
   const { open, close } = useSidebar()
 
@@ -31,15 +31,36 @@ export default function Sidebar() {
     ...(household ? [{ id: 'family', path: '/family', icon: 'users', label: t('nav.family') }] : []),
   ]
   const tools = [
-    { id: 'calendar',  path: '/calendar',  icon: 'calendar',  label: t('nav.calendar') },
-    { id: 'review',    path: '/review',    icon: 'review',    label: t('nav.review'),  badge: badge(counts.review), badgeKind: 'warn' },
-    { id: 'reports',   path: '/reports',   icon: 'report',    label: t('nav.reports') },
-    { id: 'recurring', path: '/recurring', icon: 'recurring', label: t('nav.recurring') },
-    { id: 'accounts',     path: '/accounts',     icon: 'account',     label: t('nav.accounts') },
-    { id: 'categories',   path: '/categories',   icon: 'filter',      label: t('nav.categories') },
-    { id: 'obligations',  path: '/obligations',  icon: 'trend-down',  label: t('nav.obligations') },
-    { id: 'settings',     path: '/settings',     icon: 'cog',         label: t('nav.settings') },
+    { id: 'calendar',   path: '/calendar',   icon: 'calendar',   label: t('nav.calendar') },
+    { id: 'review',     path: '/review',     icon: 'review',     label: t('nav.review'),  badge: badge(counts.review), badgeKind: 'warn' },
+    { id: 'reports',    path: '/reports',    icon: 'report',     label: t('nav.reports') },
+    { id: 'recurring',  path: '/recurring',  icon: 'recurring',  label: t('nav.recurring') },
+    { id: 'accounts',   path: '/accounts',   icon: 'account',    label: t('nav.accounts') },
+    { id: 'categories', path: '/categories', icon: 'filter',     label: t('nav.categories') },
+    { id: 'obligations',path: '/obligations',icon: 'trend-down', label: t('nav.obligations') },
+    { id: 'settings',   path: '/settings',   icon: 'cog',        label: t('nav.settings') },
   ]
+
+  const toolPaths = new Set(tools.map(t => t.path))
+  const activeToolRoute = toolPaths.has(location.pathname)
+
+  // Accordion state — default open; auto-open when a tools route is active
+  const [toolsOpen, setToolsOpen] = useState(
+    () => localStorage.getItem('hacienda_tools_open') !== 'false'
+  )
+
+  useEffect(() => {
+    if (activeToolRoute && !toolsOpen) {
+      setToolsOpen(true)
+      localStorage.setItem('hacienda_tools_open', 'true')
+    }
+  }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleTools() {
+    const next = !toolsOpen
+    setToolsOpen(next)
+    localStorage.setItem('hacienda_tools_open', String(next))
+  }
 
   const Item = ({ it }) => {
     const active = location.pathname === it.path
@@ -66,8 +87,33 @@ export default function Sidebar() {
         <div className="sb-section">{t('nav.principal')}</div>
         {principal.map(it => <Item key={it.id} it={it} />)}
 
-        <div className="sb-section">{t('nav.tools')}</div>
-        {tools.map(it => <Item key={it.id} it={it} />)}
+        {/* Tools accordion */}
+        <button
+          onClick={toggleTools}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+            padding: '14px 16px 6px',
+            color: 'var(--ink-3)',
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {t('nav.tools')}
+          </span>
+          <Icon name="chevron-down" size={13} style={{
+            transition: 'transform 0.22s ease',
+            transform: toolsOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+            color: 'var(--ink-3)',
+          }} />
+        </button>
+
+        <div style={{
+          overflow: 'hidden',
+          maxHeight: toolsOpen ? '600px' : '0px',
+          transition: 'max-height 0.25s ease',
+        }}>
+          {tools.map(it => <Item key={it.id} it={it} />)}
+        </div>
       </div>
 
       <div className="sb-bottom">
