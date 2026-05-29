@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { SidebarProvider, useSidebar } from '../lib/sidebar'
+import { useAccounts } from '../hooks/useAccounts'
+import { supabase } from '../lib/supabase'
+import OnboardingWizard from './OnboardingWizard'
+import ImportModal from './ImportModal'
 import Dashboard from '../screens/Dashboard'
 import Transactions from '../screens/Transactions'
 import Budgets from '../screens/Budgets'
@@ -35,6 +39,29 @@ function ShellInner() {
   const { open, close } = useSidebar()
   useEffect(() => applyAccent(accent), [accent])
 
+  const { accounts, loading: acctLoading, addAccount } = useAccounts()
+  const [showWizard, setShowWizard] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+
+  useEffect(() => {
+    if (acctLoading) return
+    if (accounts.length === 0 && localStorage.getItem('hacienda_onboarded') !== 'true') {
+      setShowWizard(true)
+    }
+  }, [acctLoading, accounts.length])
+
+  function dismissWizard() {
+    localStorage.setItem('hacienda_onboarded', 'true')
+    setShowWizard(false)
+  }
+
+  async function handleImportSave(rows) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const user_id = session?.user?.id
+    const { error } = await supabase.from('transactions').insert(rows.map(r => ({ ...r, user_id })))
+    if (error) throw new Error(error.message)
+  }
+
   return (
     <div className="app">
       <div className="app-shell">
@@ -60,6 +87,21 @@ function ShellInner() {
           </Routes>
         </main>
       </div>
+
+      {showWizard && (
+        <OnboardingWizard
+          onClose={dismissWizard}
+          onOpenImport={() => setShowImport(true)}
+          addAccount={addAccount}
+        />
+      )}
+
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onSave={handleImportSave}
+        />
+      )}
     </div>
   )
 }

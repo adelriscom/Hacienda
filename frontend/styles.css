@@ -489,6 +489,44 @@
 
 .divider { height: 1px; background: var(--line); margin: 14px 0; }
 
+/* ──────────── Onboarding wizard ──────────── */
+.onboarding-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 16px;
+}
+.onboarding-icon.accent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-3));
+  color: white;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+}
+.onboarding-icon.success {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.onboarding-body-center {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+.onboarding-body-center h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-0);
+  letter-spacing: -0.02em;
+}
+.onboarding-body-center p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  max-width: 340px;
+  margin-inline: auto;
+}
+
 /* ──────────── Login input focus (inline-styled, needs explicit focus ring) ──────────── */
 .login-input:focus { outline: none; border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(99,102,241,.25); }
 
