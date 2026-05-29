@@ -5,7 +5,7 @@
     "dashboard": "Tableau de bord", "expenses": "Dépenses", "income": "Revenus",
     "budgets": "Budgets", "calendar": "Calendrier", "review": "À réviser",
     "reports": "Rapports", "recurring": "Récurrents", "accounts": "Comptes",
-    "categories": "Catégories"
+    "categories": "Catégories", "obligations": "Obligations"
   },
   "login": {
     "tagline": "Gestion financière familiale",
@@ -244,6 +244,11 @@
       "currency": "Devise",
       "balance": "Solde actuel",
       "creditLimit": "Limite de crédit",
+      "interestRate": "Taux d'intérêt annuel (% APR)",
+      "interestRatePlaceholder": "ex. 19.99",
+      "monthlyPayment": "Paiement mensuel",
+      "originalAmount": "Montant initial du prêt",
+      "paymentDueDay": "Jour d'échéance (1–31)",
       "active": "Compte actif",
       "cancel": "Annuler",
       "saving": "Enregistrement…",

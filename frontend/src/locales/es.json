@@ -5,7 +5,7 @@
     "dashboard": "Dashboard", "expenses": "Gastos", "income": "Ingresos",
     "budgets": "Presupuestos", "calendar": "Calendario", "review": "Por revisar",
     "reports": "Reportes", "recurring": "Recurrencias", "accounts": "Cuentas",
-    "categories": "Categorías"
+    "categories": "Categorías", "obligations": "Obligaciones"
   },
   "login": {
     "tagline": "Control familiar de finanzas",
@@ -244,6 +244,11 @@
       "currency": "Moneda",
       "balance": "Saldo actual",
       "creditLimit": "Límite de crédito",
+      "interestRate": "Tasa de interés anual (% APR)",
+      "interestRatePlaceholder": "Ej. 19.99",
+      "monthlyPayment": "Pago mensual",
+      "originalAmount": "Monto original del préstamo",
+      "paymentDueDay": "Día de pago (1–31)",
       "active": "Cuenta activa",
       "cancel": "Cancelar",
       "saving": "Guardando…",

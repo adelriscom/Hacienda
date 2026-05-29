@@ -34,8 +34,9 @@ export default function Sidebar() {
     { id: 'review',    path: '/review',    icon: 'review',    label: t('nav.review'),  badge: badge(counts.review), badgeKind: 'warn' },
     { id: 'reports',   path: '/reports',   icon: 'report',    label: t('nav.reports') },
     { id: 'recurring', path: '/recurring', icon: 'recurring', label: t('nav.recurring') },
-    { id: 'accounts',    path: '/accounts',   icon: 'account',  label: t('nav.accounts') },
-    { id: 'categories',  path: '/categories', icon: 'filter',   label: t('nav.categories') },
+    { id: 'accounts',     path: '/accounts',     icon: 'account',     label: t('nav.accounts') },
+    { id: 'categories',   path: '/categories',   icon: 'filter',      label: t('nav.categories') },
+    { id: 'obligations',  path: '/obligations',  icon: 'trend-down',  label: t('nav.obligations') },
   ]
 
   const Item = ({ it }) => {

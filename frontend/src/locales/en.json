@@ -5,7 +5,7 @@
     "dashboard": "Dashboard", "expenses": "Expenses", "income": "Income",
     "budgets": "Budgets", "calendar": "Calendar", "review": "Review",
     "reports": "Reports", "recurring": "Recurring", "accounts": "Accounts",
-    "categories": "Categories"
+    "categories": "Categories", "obligations": "Obligations"
   },
   "login": {
     "tagline": "Family finance control",
@@ -247,6 +247,9 @@
       "creditLimit": "Credit limit",
       "interestRate": "Annual Interest Rate (% APR)",
       "interestRatePlaceholder": "e.g. 19.99",
+      "monthlyPayment": "Monthly payment",
+      "originalAmount": "Original loan amount",
+      "paymentDueDay": "Payment due day (1–31)",
       "active": "Active account",
       "cancel": "Cancel",
       "saving": "Saving…",

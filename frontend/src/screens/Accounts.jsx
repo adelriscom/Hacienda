@@ -274,13 +274,15 @@ function AccountCard({ account: a, onEdit, onToggle, t }) {
   )
 }
 
-const EMPTY_FORM = { name: '', type: 'checking', currency: 'CAD', balance: '', credit_limit: '', interest_rate: '', is_active: true }
+const EMPTY_FORM = { name: '', type: 'checking', currency: 'CAD', balance: '', credit_limit: '', interest_rate: '', monthly_payment: '', original_amount: '', payment_due_day: '', is_active: true }
 
 function AccountModal({ account, onClose, onSave, t }) {
   const [form, setForm] = useState(account
     ? { name: account.name, type: account.type, currency: account.currency,
         balance: account.balance ?? '', credit_limit: account.credit_limit ?? '',
-        interest_rate: account.interest_rate ?? '', is_active: account.is_active }
+        interest_rate: account.interest_rate ?? '',
+        monthly_payment: account.monthly_payment ?? '', original_amount: account.original_amount ?? '',
+        payment_due_day: account.payment_due_day ?? '', is_active: account.is_active }
     : EMPTY_FORM
   )
   const [saving, setSaving] = useState(false)
@@ -295,16 +297,19 @@ function AccountModal({ account, onClose, onSave, t }) {
     }
     setSaving(true); setError(null)
     try {
+      const isDebt = form.type === 'credit'
       await onSave({
-        name:          form.name.trim(),
-        type:          form.type,
-        currency:      form.currency,
-        balance:       parseFloat(form.balance) || 0,
-        credit_limit:  form.type === 'credit' && form.credit_limit ? parseFloat(form.credit_limit) : null,
-        interest_rate: ['credit', 'savings', 'investment'].includes(form.type) && form.interest_rate
-                         ? parseFloat(form.interest_rate)
-                         : 0,
-        is_active:     form.is_active,
+        name:            form.name.trim(),
+        type:            form.type,
+        currency:        form.currency,
+        balance:         parseFloat(form.balance) || 0,
+        credit_limit:    isDebt && form.credit_limit ? parseFloat(form.credit_limit) : null,
+        interest_rate:   ['credit', 'savings', 'investment'].includes(form.type) && form.interest_rate
+                           ? parseFloat(form.interest_rate) : 0,
+        monthly_payment: isDebt && form.monthly_payment ? parseFloat(form.monthly_payment) : null,
+        original_amount: form.original_amount ? parseFloat(form.original_amount) : null,
+        payment_due_day: isDebt && form.payment_due_day ? parseInt(form.payment_due_day, 10) : null,
+        is_active:       form.is_active,
       })
     } catch (err) {
       setError(err.message)
@@ -363,6 +368,30 @@ function AccountModal({ account, onClose, onSave, t }) {
                 <input type="number" step="0.01" min="0" max="100"
                   placeholder={t('acct.modal.interestRatePlaceholder')}
                   value={form.interest_rate} onChange={e => set('interest_rate', e.target.value)} />
+              </div>
+            )}
+
+            {form.type === 'credit' && (
+              <div className="form-field">
+                <label>{t('acct.modal.monthlyPayment')}</label>
+                <input type="number" step="0.01" min="0" placeholder="0.00"
+                  value={form.monthly_payment} onChange={e => set('monthly_payment', e.target.value)} />
+              </div>
+            )}
+
+            {form.type === 'credit' && (
+              <div className="form-field">
+                <label>{t('acct.modal.paymentDueDay')}</label>
+                <input type="number" step="1" min="1" max="31" placeholder="e.g. 15"
+                  value={form.payment_due_day} onChange={e => set('payment_due_day', e.target.value)} />
+              </div>
+            )}
+
+            {form.type === 'credit' && (
+              <div className="form-field">
+                <label>{t('acct.modal.originalAmount')}</label>
+                <input type="number" step="0.01" min="0" placeholder="0.00"
+                  value={form.original_amount} onChange={e => set('original_amount', e.target.value)} />
               </div>
             )}
 
