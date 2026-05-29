@@ -107,12 +107,17 @@ export default function Sidebar() {
           }} />
         </button>
 
+        {/* Outer grid controls height; inner overflow:hidden makes 0fr collapse work.
+            Negative margin + matching padding lets the active-indicator pseudo-element
+            (positioned at left:-14px inside .sb-item) show through. */}
         <div style={{
-          overflow: 'hidden',
-          maxHeight: toolsOpen ? '600px' : '0px',
-          transition: 'max-height 0.25s ease',
+          display: 'grid',
+          gridTemplateRows: toolsOpen ? '1fr' : '0fr',
+          transition: 'grid-template-rows 0.25s ease',
         }}>
-          {tools.map(it => <Item key={it.id} it={it} />)}
+          <div style={{ overflow: 'hidden', marginLeft: -14, paddingLeft: 14 }}>
+            {tools.map(it => <Item key={it.id} it={it} />)}
+          </div>
         </div>
       </div>
 
