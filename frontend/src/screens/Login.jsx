@@ -52,20 +52,22 @@ export default function Login() {
         <p style={styles.sub}>{t('login.tagline')}</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>
+          <label htmlFor="login-email" style={styles.label}>
             <Icon name="mail" size={14} style={{ color: 'var(--ink-3)' }} />
             {t('login.email')}
           </label>
-          <input style={styles.input} type="email" value={email}
-            onChange={e => setEmail(e.target.value)}
+          <input id="login-email" style={styles.input} className="login-input" type="email"
+            name="email" autoComplete="email"
+            value={email} onChange={e => setEmail(e.target.value)}
             placeholder={t('login.emailPlaceholder')} required autoFocus />
 
-          <label style={styles.label}>
+          <label htmlFor="login-password" style={styles.label}>
             <Icon name="lock" size={14} style={{ color: 'var(--ink-3)' }} />
             {t('login.password')}
           </label>
-          <input style={styles.input} type="password" value={password}
-            onChange={e => setPassword(e.target.value)}
+          <input id="login-password" style={styles.input} className="login-input" type="password"
+            name="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            value={password} onChange={e => setPassword(e.target.value)}
             placeholder="••••••••" required minLength={6} />
 
           {error && <p style={styles.error}>{error}</p>}

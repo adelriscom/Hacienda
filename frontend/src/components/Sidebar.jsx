@@ -65,11 +65,16 @@ export default function Sidebar() {
   const Item = ({ it }) => {
     const active = location.pathname === it.path
     return (
-      <div className={`sb-item ${active ? 'active' : ''}`} onClick={() => { navigate(it.path); close() }}>
+      <button
+        type="button"
+        className={`sb-item ${active ? 'active' : ''}`}
+        onClick={() => { navigate(it.path); close() }}
+        aria-current={active ? 'page' : undefined}
+      >
         <Icon name={it.icon} className="ico" />
         <span>{it.label}</span>
         {it.badge && <span className={`badge ${it.badgeKind || ''}`}>{it.badge}</span>}
-      </div>
+      </button>
     )
   }
 
@@ -90,6 +95,7 @@ export default function Sidebar() {
         {/* Tools accordion */}
         <button
           onClick={toggleTools}
+          aria-expanded={toolsOpen}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             width: '100%', background: 'none', border: 'none', cursor: 'pointer',
@@ -173,7 +179,7 @@ export default function Sidebar() {
             <div className="sb-user-display">{myName || email.split('@')[0]}</div>
             <div className="sb-user-email" title={email}>{email}</div>
           </div>
-          <button className="sb-signout" title="Sign out" onClick={() => supabase.auth.signOut()}>
+          <button className="sb-signout" title="Sign out" aria-label="Sign out" onClick={() => supabase.auth.signOut()}>
             <Icon name="logout" size={14} />
           </button>
         </div>

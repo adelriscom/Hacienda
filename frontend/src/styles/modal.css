@@ -241,6 +241,7 @@
     display: block;        /* disable flex so sticky positioning works */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   /* Header sticks to top as user scrolls down through form */
   .modal-header {

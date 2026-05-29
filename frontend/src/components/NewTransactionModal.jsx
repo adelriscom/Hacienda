@@ -141,26 +141,26 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             )}
 
             <div className="form-field">
-              <label>{t('newTx.date')}</label>
-              <input type="date" value={form.occurred_at}
+              <label htmlFor="tx-date">{t('newTx.date')}</label>
+              <input id="tx-date" name="occurred_at" type="date" value={form.occurred_at}
                 onChange={e => set('occurred_at', e.target.value)} required />
             </div>
 
             <div className="form-field">
-              <label>{t('newTx.amount')}</label>
-              <input type="number" min="0" step="0.01" placeholder="0.00"
+              <label htmlFor="tx-amount">{t('newTx.amount')}</label>
+              <input id="tx-amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00"
                 value={form.amount} onChange={e => set('amount', e.target.value)} required />
             </div>
 
             <div className="form-field span-2">
-              <label>{t('newTx.description')}</label>
-              <input type="text" placeholder={t('newTx.descriptionPlaceholder')}
+              <label htmlFor="tx-desc">{t('newTx.description')}</label>
+              <input id="tx-desc" name="description" type="text" placeholder={t('newTx.descriptionPlaceholder')}
                 value={form.description} onChange={e => set('description', e.target.value)} required />
             </div>
 
             <div className="form-field">
-              <label>{t('newTx.account')}</label>
-              <select value={form.account_id} onChange={e => set('account_id', e.target.value)}>
+              <label htmlFor="tx-account">{t('newTx.account')}</label>
+              <select id="tx-account" name="account_id" value={form.account_id} onChange={e => set('account_id', e.target.value)}>
                 <option value="">{t('newTx.accountSelect')}</option>
                 {cadAccounts.length > 0 && (
                   <optgroup label="CAD">
@@ -176,8 +176,8 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             </div>
 
             <div className="form-field">
-              <label>{t('newTx.category')}</label>
-              <select value={form.category_id} onChange={e => set('category_id', e.target.value)}>
+              <label htmlFor="tx-category">{t('newTx.category')}</label>
+              <select id="tx-category" name="category_id" value={form.category_id} onChange={e => set('category_id', e.target.value)}>
                 <option value="">{t('newTx.categorySelect')}</option>
                 {parents.map(parent => {
                   const children = childrenOf[parent.id]
@@ -194,8 +194,8 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             </div>
 
             <div className="form-field">
-              <label>{t('newTx.person')}</label>
-              <select value={form.person} onChange={e => set('person', e.target.value)}>
+              <label htmlFor="tx-person">{t('newTx.person')}</label>
+              <select id="tx-person" name="person" value={form.person} onChange={e => set('person', e.target.value)}>
                 <option value="Alexander">Alexander</option>
                 <option value="Marcela">Marcela</option>
                 <option value="Shared">{t('newTx.shared')}</option>
@@ -204,8 +204,8 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
 
             {isEdit && (
               <div className="form-field">
-                <label>{t('newTx.status')}</label>
-                <select value={form.status} onChange={e => set('status', e.target.value)}>
+                <label htmlFor="tx-status">{t('newTx.status')}</label>
+                <select id="tx-status" name="status" value={form.status} onChange={e => set('status', e.target.value)}>
                   {statuses.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
@@ -221,8 +221,8 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             </div>
 
             <div className="form-field span-2">
-              <label>{t('newTx.notes')}</label>
-              <textarea placeholder={t('newTx.notesPlaceholder')}
+              <label htmlFor="tx-notes">{t('newTx.notes')}</label>
+              <textarea id="tx-notes" name="notes" placeholder={t('newTx.notesPlaceholder')}
                 value={form.notes} onChange={e => set('notes', e.target.value)} />
             </div>
 
