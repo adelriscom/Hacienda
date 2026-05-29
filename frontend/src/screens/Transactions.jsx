@@ -417,12 +417,6 @@ function TxRow({ t: tx, selected, onToggle, onEdit, onStatusToggle }) {
   const dateStr = d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
   const timeStr = d.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-  const STATUS_NEXT  = { review: 'match', match: 'review', ghost: 'match', duplicate: 'match' }
-  const STATUS_HINT  = { review: 'Mark as cleared', match: 'Mark as to review', ghost: 'Clear ghost charge', duplicate: 'Mark as cleared (not a duplicate)' }
-  const canToggleStatus = tx.type !== 'transfer'
-  const nextStatus      = STATUS_NEXT[tx.status] || 'match'
-  const statusTitle     = STATUS_HINT[tx.status] || 'Mark as cleared'
-
   return (
     <div className={`tx-row ${isGhost ? 'ghost-row-tx' : ''} ${isReview ? 'review-row-tx' : ''} ${selected ? 'tx-row-selected' : ''}`}
       onClick={e => { if (e.target.type !== 'checkbox' && e.target.closest('.icon-btn')) return; if (e.target.type !== 'checkbox') onToggle() }}
@@ -452,15 +446,10 @@ function TxRow({ t: tx, selected, onToggle, onEdit, onStatusToggle }) {
         {tx.tag && (
           <span
             className={`chip tag-${tx.tag.kind}`}
-            title={canToggleStatus ? statusTitle : undefined}
-            style={{ cursor: canToggleStatus ? 'pointer' : 'default', transition: 'opacity .15s' }}
-            onClick={() => {
-              if (!canToggleStatus) return
-              onStatusToggle(tx.id, nextStatus).catch(err => {
-                console.error('Status toggle failed:', err.message)
-              })
-            }}
-            onMouseEnter={e => { if (canToggleStatus) e.currentTarget.style.opacity = '0.65' }}
+            title="Edit transaction"
+            style={{ cursor: 'pointer', transition: 'opacity .15s' }}
+            onClick={() => onEdit(tx)}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.65'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}
           >
             {tx.tag.kind === 'ghost'  && <Icon name="ghost"  size={10} />}
