@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import { useBudgets } from '../hooks/useBudgets'
 import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 import { useExchangeRate } from '../hooks/useExchangeRate'
+import { supabase } from '../lib/supabase'
 
 function nowMonth() {
   const now = new Date()
@@ -41,6 +42,7 @@ export default function Budgets() {
   const { t } = useTranslation()
   const [filterMonth, setFilterMonth] = useState(nowMonth)
   const [editing, setEditing]         = useState(null)
+  const [selectedBudget, setSelectedBudget] = useState(null)
   const [editingRate, setEditingRate] = useState(false)
   const [rateInput, setRateInput]     = useState('')
 
@@ -174,6 +176,7 @@ export default function Budgets() {
                 budget={b}
                 spent={spent}
                 onEdit={() => setEditing(b)}
+                onClick={() => setSelectedBudget(b)}
                 t={t} />
             )
           })}
@@ -189,6 +192,15 @@ export default function Budgets() {
             </div>
           )}
         </div>
+      )}
+
+      {selectedBudget && (
+        <BudgetDetailModal
+          budget={selectedBudget}
+          filterMonth={filterMonth}
+          spending={spending}
+          onClose={() => setSelectedBudget(null)}
+        />
       )}
 
       {editing !== null && (
@@ -213,7 +225,7 @@ export default function Budgets() {
   )
 }
 
-function Envelope({ budget: b, spent, onEdit, t }) {
+function Envelope({ budget: b, spent, onEdit, onClick, t }) {
   const rawPct   = b.amount > 0 ? (spent / b.amount) * 100 : 0
   const pct      = Math.min(rawPct, 120)
   const over     = spent > b.amount
@@ -222,6 +234,7 @@ function Envelope({ budget: b, spent, onEdit, t }) {
   const ahead    = !over && rawPct > mPct + 10
   const color    = b.category?.color || 'var(--accent)'
   const barColor = over ? 'var(--neg)' : warning ? 'var(--warn)' : color
+  const remaining = b.amount - spent
 
   const chipClass = over ? 'tag-warn' : warning ? 'tag-warn' : ahead ? '' : 'tag-ok'
   const chipLabel = over
@@ -233,7 +246,11 @@ function Envelope({ budget: b, spent, onEdit, t }) {
         : t('budget.onPace')
 
   return (
-    <div className={`envelope ${over ? 'envelope-over' : warning ? 'envelope-warn' : ''}`}>
+    <div
+      className={`envelope ${over ? 'envelope-over' : warning ? 'envelope-warn' : ''}`}
+      onClick={onClick}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="env-head">
         <div className="env-icon" style={{ background: `${color}22`, color }}>
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
@@ -246,7 +263,8 @@ function Envelope({ budget: b, spent, onEdit, t }) {
             border: '1px solid rgba(20,184,166,.3)', marginLeft: 4, flexShrink: 0,
           }}>COP</span>
         )}
-        <button className="icon-btn sm-btn" style={{ marginLeft: 'auto' }} onClick={onEdit}>
+        <button className="icon-btn sm-btn" style={{ marginLeft: 'auto' }}
+          onClick={e => { e.stopPropagation(); onEdit() }}>
           <Icon name="more" size={12} />
         </button>
       </div>
@@ -262,8 +280,8 @@ function Envelope({ budget: b, spent, onEdit, t }) {
       </div>
       <div className="env-foot">
         <span className={`chip ${chipClass}`}>{chipLabel}</span>
-        <span style={{ fontSize: 10.5, color: 'var(--ink-3)', marginLeft: 'auto' }}>
-          {Math.round(rawPct)}%
+        <span style={{ fontSize: 10.5, color: over ? 'var(--neg)' : 'var(--ink-3)', marginLeft: 'auto', fontWeight: over ? 600 : 400 }}>
+          {over ? `${fmt(-remaining, b.currency)} over` : `${fmt(remaining, b.currency)} left`}
         </span>
       </div>
     </div>
@@ -273,6 +291,121 @@ function Envelope({ budget: b, spent, onEdit, t }) {
 function monthPctNow() {
   const now = new Date()
   return (now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()) * 100
+}
+
+function StatBox({ label, value, color }) {
+  return (
+    <div style={{
+      background: 'var(--bg-2)', borderRadius: 10, padding: '10px 12px',
+      border: '1px solid var(--border)',
+    }}>
+      <div style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div className="num" style={{ fontSize: 14, fontWeight: 700, color }}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function BudgetDetailModal({ budget: b, filterMonth, spending, onClose }) {
+  const [txns, setTxns]       = useState([])
+  const [txLoading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchTxns() {
+      const [y, m] = filterMonth.split('-').map(Number)
+      const from = `${filterMonth}-01`
+      const nextMonth = new Date(y, m, 1)
+      const to = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+
+      const { data } = await supabase
+        .from('transactions')
+        .select('id, occurred_at, description, amount, account:accounts(name, currency)')
+        .eq('category_id', b.category_id)
+        .eq('type', 'expense')
+        .gte('occurred_at', from)
+        .lt('occurred_at', to)
+        .order('occurred_at', { ascending: false })
+
+      setTxns(data || [])
+      setLoading(false)
+    }
+    fetchTxns()
+  }, [b.category_id, filterMonth])
+
+  const sp        = spending[b.category_id] || { CAD: 0, COP: 0 }
+  const spent     = sp[b.currency] || 0
+  const remaining = b.amount - spent
+  const over      = spent > b.amount
+  const pct       = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
+  const color     = b.category?.color || 'var(--accent)'
+  const barColor  = over ? 'var(--neg)' : color
+
+  return (
+    <Modal title={b.category?.name || '—'} onClose={onClose} wide>
+      <div className="modal-body">
+        {/* Stat boxes */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          <StatBox label="Allocated" value={fmt(b.amount, b.currency)} color="var(--ink-1)" />
+          <StatBox label="Spent"     value={fmt(spent, b.currency)}    color={over ? 'var(--neg)' : 'var(--ink-1)'} />
+          <StatBox
+            label={over ? 'Over budget' : 'Remaining'}
+            value={fmt(Math.abs(remaining), b.currency)}
+            color={over ? 'var(--neg)' : 'var(--pos)'}
+          />
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-3)', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', width: `${pct}%`, background: barColor,
+              borderRadius: 4, transition: 'width 0.4s ease',
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11, color: 'var(--ink-3)' }}>
+            <span>0</span>
+            <span style={{ color: over ? 'var(--neg)' : 'var(--ink-2)', fontWeight: 500 }}>{Math.round(pct)}% used</span>
+            <span>{fmt(b.amount, b.currency)}</span>
+          </div>
+        </div>
+
+        {/* Transaction list */}
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+          Transactions
+        </div>
+        {txLoading ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>Loading…</div>
+        ) : txns.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>No transactions this month</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {txns.map(tx => (
+              <div key={tx.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 0', borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {tx.description || '—'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                    {new Date(tx.occurred_at + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    {tx.account?.name && ` · ${tx.account.name}`}
+                  </div>
+                </div>
+                <div className="num" style={{ fontSize: 13, fontWeight: 600, color: 'var(--neg)', flexShrink: 0 }}>
+                  {fmt(tx.amount, tx.account?.currency || b.currency)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
 }
 
 function BudgetModal({ budget, categories, budgetedCatIds = new Set(), onClose, onSave, onDelete, t }) {
