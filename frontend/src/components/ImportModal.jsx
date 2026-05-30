@@ -1,11 +1,27 @@
 import { useState, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import Icon from './Icon'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
 import { supabase } from '../lib/supabase'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc
+
+async function extractPdfText(file) {
+  const arrayBuffer = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise
+  let text = ''
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum)
+    const content = await page.getTextContent()
+    text += content.items.map(item => item.str).join(' ') + '\n'
+  }
+  return text
+}
 
 function serialToISO(serial) {
   return new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString().slice(0, 10)
@@ -202,6 +218,7 @@ export default function ImportModal({ onClose, onSave }) {
   const [preview, setPreview]       = useState(null)
   const [stats, setStats]           = useState(null)
   const [dragOver, setDragOver]     = useState(false)
+  const [parsingMsg, setParsingMsg] = useState('')
   const [defaultAcct, setDefaultAcct]     = useState('')
   const [defaultPerson, setDefaultPerson] = useState('Alexander')
   const [saving, setSaving]         = useState(false)
@@ -214,8 +231,80 @@ export default function ImportModal({ onClose, onSave }) {
   const cadAccounts = accounts.filter(a => a.currency === 'CAD')
   const copAccounts = accounts.filter(a => a.currency === 'COP')
 
-  const loadFile = useCallback((f) => {
+  const loadFile = useCallback(async (f) => {
     setError(null)
+
+    if (f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf') {
+      setStep('parsing')
+      setParsingMsg('Extracting text from PDF…')
+      try {
+        const text = await extractPdfText(f)
+        setParsingMsg('Analyzing with AI — this takes a few seconds…')
+        const res = await fetch('/api/parse-statement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        })
+        if (!res.ok) {
+          if (res.status === 404) throw new Error('PDF parsing requires a deployed environment. Run `vercel dev` locally or deploy to Vercel.')
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || `Server error ${res.status}`)
+        }
+        const { transactions } = await res.json()
+        if (!Array.isArray(transactions) || transactions.length === 0) {
+          throw new Error('No transactions found in this PDF. Try a different statement.')
+        }
+        const rows = transactions.map(tx => ({
+          occurred_at:       new Date(((tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) ? tx.date : new Date().toISOString().slice(0, 10)) + 'T12:00:00').toISOString(),
+          description:       String(tx.description || '').trim(),
+          amount:            typeof tx.amount === 'number' ? tx.amount : parseFloat(String(tx.amount).replace(/[$, ]/g, '')) || 0,
+          type:              ['expense', 'income', 'transfer'].includes(tx.type) ? tx.type : 'expense',
+          category_name:     '',
+          category_id:       null,
+          account_name:      '',
+          person:            '',
+          notes:             null,
+          is_recurring:      false,
+          status:            'review',
+          _cat_warn:         false,
+          _acct_new:         false,
+          _resolved_acct_id: null,
+        }))
+        const dates = rows.map(r => r.occurred_at.slice(0, 10)).filter(Boolean)
+        let taggedRows = rows
+        let dups = 0
+        if (dates.length > 0) {
+          const minDate = dates.reduce((a, b) => a < b ? a : b)
+          const maxDate = dates.reduce((a, b) => a > b ? a : b)
+          const { data: existing } = await supabase
+            .from('transactions')
+            .select('occurred_at, amount, description')
+            .gte('occurred_at', minDate)
+            .lte('occurred_at', maxDate + 'T23:59:59')
+          const existingSet = new Set(
+            (existing || []).map(t => `${t.occurred_at.slice(0, 10)}|${t.amount}|${t.description?.toLowerCase()}`)
+          )
+          taggedRows = rows.map(r => ({
+            ...r,
+            _isDup: existingSet.has(`${r.occurred_at.slice(0, 10)}|${r.amount}|${r.description?.toLowerCase()}`),
+          }))
+          dups = taggedRows.filter(r => r._isDup).length
+        }
+        setSelectedSheet('PDF')
+        setStats({ total: rows.length, isSheet1: false, isPdf: true, catMatched: 0, catUnmatched: 0, detectedHeaders: [] })
+        setRows(taggedRows)
+        setPreview(taggedRows.slice(0, 15))
+        setDupCount(dups)
+        setSkipDups(dups > 0)
+        setNewAcctNames([])
+        setStep('preview')
+      } catch (err) {
+        setError(err.message)
+        setStep('upload')
+      }
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -339,11 +428,26 @@ export default function ImportModal({ onClose, onSave }) {
     setStats(null); setError(null); setSheetNames([]); setSelectedSheet('')
     setDefaultAcct(''); setDefaultPerson('Alexander')
     setDupCount(0); setSkipDups(true); setNewAcctNames([])
+    setParsingMsg('')
   }
 
   return (
     <Modal title={t('import.title')} onClose={onClose} wide>
       <div className="modal-body">
+
+        {/* ── PDF parsing spinner ── */}
+        {step === 'parsing' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '40px 0' }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              border: '3px solid rgba(99,102,241,.25)',
+              borderTopColor: 'var(--accent)',
+              animation: 'spin 0.7s linear infinite',
+            }} />
+            <p style={{ fontSize: 14, color: 'var(--ink-1)', margin: 0 }}>{parsingMsg}</p>
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: 0 }}>Usually 5–15 seconds</p>
+          </div>
+        )}
 
         {/* ── Step 1: Drop zone ── */}
         {step === 'upload' && (
@@ -357,7 +461,7 @@ export default function ImportModal({ onClose, onSave }) {
             <div className="drop-zone-icon"><Icon name="upload" size={20} /></div>
             <h3>{t('import.dropTitle')}</h3>
             <p>{t('import.dropSub')}</p>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv,.pdf"
               style={{ display: 'none' }}
               onChange={e => e.target.files[0] && loadFile(e.target.files[0])} />
           </div>
@@ -391,15 +495,23 @@ export default function ImportModal({ onClose, onSave }) {
         {/* ── Step 3: Preview ── */}
         {step === 'preview' && stats && (
           <>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
-              {t('import.sheetInfo')}<strong style={{ color: 'var(--ink-1)' }}>{selectedSheet}</strong>
-              {' · '}{t('import.formatInfo')}
-              <strong style={{ color: 'var(--ink-1)' }}>
-                {stats.isSheet1 ? t('import.formatNoHeaders') : t('import.formatWithHeaders')}
-              </strong>
-            </div>
+            {!stats.isPdf && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+                {t('import.sheetInfo')}<strong style={{ color: 'var(--ink-1)' }}>{selectedSheet}</strong>
+                {' · '}{t('import.formatInfo')}
+                <strong style={{ color: 'var(--ink-1)' }}>
+                  {stats.isSheet1 ? t('import.formatNoHeaders') : t('import.formatWithHeaders')}
+                </strong>
+              </div>
+            )}
+            {stats.isPdf && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+                <strong style={{ color: 'var(--accent)' }}>✦ AI-parsed PDF</strong>
+                {' · '}{stats.total} transactions extracted — review before importing
+              </div>
+            )}
 
-            {!stats.isSheet1 && stats.detectedHeaders?.length > 0 && (
+            {!stats.isSheet1 && !stats.isPdf && stats.detectedHeaders?.length > 0 && (
               <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 12,
                 background: 'var(--bg-2)', borderRadius: 8, padding: '8px 12px' }}>
                 {t('import.detectedCols')} {stats.detectedHeaders.map((h, i) => (
@@ -419,13 +531,15 @@ export default function ImportModal({ onClose, onSave }) {
                 <div className="import-stat-num">{stats.total}</div>
                 <div className="import-stat-label">{t('import.statsTotal')}</div>
               </div>
-              <div className="import-stat">
-                <div className="import-stat-num" style={{ color: stats.catUnmatched ? 'var(--warn)' : 'var(--pos)' }}>
-                  {stats.catMatched}
+              {!stats.isPdf && (
+                <div className="import-stat">
+                  <div className="import-stat-num" style={{ color: stats.catUnmatched ? 'var(--warn)' : 'var(--pos)' }}>
+                    {stats.catMatched}
+                  </div>
+                  <div className="import-stat-label">{t('import.statsCatOk')}</div>
                 </div>
-                <div className="import-stat-label">{t('import.statsCatOk')}</div>
-              </div>
-              {stats.catUnmatched > 0 && (
+              )}
+              {!stats.isPdf && stats.catUnmatched > 0 && (
                 <div className="import-stat">
                   <div className="import-stat-num" style={{ color: 'var(--warn)' }}>{stats.catUnmatched}</div>
                   <div className="import-stat-label">{t('import.statsCatNo')}</div>
@@ -520,20 +634,22 @@ export default function ImportModal({ onClose, onSave }) {
                       <tr>
                         <th>{t('import.colDate')}</th>
                         <th>{t('import.colDesc')}</th>
-                        <th>{t('import.colCat')}</th>
-                        {!stats.isSheet1 && <th>{t('import.colAcct')}</th>}
-                        {!stats.isSheet1 && <th>{t('import.colPerson')}</th>}
+                        {!stats.isPdf && <th>{t('import.colCat')}</th>}
+                        {!stats.isSheet1 && !stats.isPdf && <th>{t('import.colAcct')}</th>}
+                        {!stats.isSheet1 && !stats.isPdf && <th>{t('import.colPerson')}</th>}
+                        {stats.isPdf && <th>Type</th>}
                         <th className="num">{t('import.colAmt')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {preview.map((r, i) => (
-                        <tr key={i} className={r._cat_warn ? 'warn-row' : ''}>
+                        <tr key={i} className={r._isDup ? 'warn-row' : ''}>
                           <td>{new Date(r.occurred_at).toLocaleDateString('en-CA', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
                           <td>{r.description || '—'}</td>
-                          <td style={{ color: r._cat_warn ? 'var(--warn)' : undefined }}>{r.category_name || '—'}</td>
-                          {!stats.isSheet1 && <td>{r.account_name || '—'}</td>}
-                          {!stats.isSheet1 && <td>{r.person || '—'}</td>}
+                          {!stats.isPdf && <td style={{ color: r._cat_warn ? 'var(--warn)' : undefined }}>{r.category_name || '—'}</td>}
+                          {!stats.isSheet1 && !stats.isPdf && <td>{r.account_name || '—'}</td>}
+                          {!stats.isSheet1 && !stats.isPdf && <td>{r.person || '—'}</td>}
+                          {stats.isPdf && <td style={{ color: r.type === 'income' ? 'var(--pos)' : r.type === 'transfer' ? 'var(--accent)' : 'var(--ink-2)', fontSize: 11 }}>{r.type}</td>}
                           <td className="num" style={{ color: r.amount > 0 ? 'var(--pos)' : 'var(--ink-0)' }}>
                             {r.amount > 0 ? '+' : '−'}${Math.abs(r.amount).toFixed(2)}
                           </td>
