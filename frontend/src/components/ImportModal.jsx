@@ -11,6 +11,14 @@ import { supabase } from '../lib/supabase'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc
 
+const PDF_MODELS = [
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku',   provider: 'Anthropic', badge: 'Fast · ~$0.01/stmt',  envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'claude-sonnet-4-6',         label: 'Claude Sonnet',  provider: 'Anthropic', badge: 'Best · ~$0.05/stmt',  envKey: 'ANTHROPIC_API_KEY' },
+  { id: 'gemini-1.5-flash',          label: 'Gemini Flash',   provider: 'Google',    badge: 'Free tier',           envKey: 'GEMINI_API_KEY'    },
+  { id: 'llama-3.3-70b-versatile',   label: 'Llama 3.3 70B', provider: 'Groq',      badge: 'Free tier · Fast',    envKey: 'GROQ_API_KEY'      },
+]
+const DEFAULT_PDF_MODEL = 'claude-haiku-4-5-20251001'
+
 async function extractPdfText(file) {
   const arrayBuffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise
@@ -219,6 +227,7 @@ export default function ImportModal({ onClose, onSave }) {
   const [stats, setStats]           = useState(null)
   const [dragOver, setDragOver]     = useState(false)
   const [parsingMsg, setParsingMsg] = useState('')
+  const [pdfModel, setPdfModel]     = useState(() => localStorage.getItem('hacienda_pdf_model') || DEFAULT_PDF_MODEL)
   const [defaultAcct, setDefaultAcct]     = useState('')
   const [defaultPerson, setDefaultPerson] = useState('Alexander')
   const [saving, setSaving]         = useState(false)
@@ -239,11 +248,12 @@ export default function ImportModal({ onClose, onSave }) {
       setParsingMsg('Extracting text from PDF…')
       try {
         const text = await extractPdfText(f)
-        setParsingMsg('Analyzing with AI — this takes a few seconds…')
+        const modelLabel = PDF_MODELS.find(m => m.id === pdfModel)?.label || 'AI'
+        setParsingMsg(`Analyzing with ${modelLabel} — this takes a few seconds…`)
         const res = await fetch('/api/parse-statement', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, model: pdfModel }),
         })
         if (!res.ok) {
           if (res.status === 404) throw new Error('PDF parsing requires a deployed environment. Run `vercel dev` locally or deploy to Vercel.')
@@ -467,6 +477,34 @@ export default function ImportModal({ onClose, onSave }) {
           </div>
         )}
 
+        {/* ── PDF model selector (only on upload step) ── */}
+        {step === 'upload' && (
+          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <p style={{ fontSize: 11, color: 'var(--ink-3)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '.5px' }}>
+              AI model for PDF parsing
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {PDF_MODELS.map(m => (
+                <button key={m.id} type="button"
+                  onClick={() => { setPdfModel(m.id); localStorage.setItem('hacienda_pdf_model', m.id) }}
+                  style={{
+                    padding: '8px 10px', borderRadius: 8, border: '1px solid', cursor: 'pointer',
+                    borderColor: pdfModel === m.id ? 'var(--accent)' : 'var(--border)',
+                    background:  pdfModel === m.id ? 'rgba(99,102,241,.1)' : 'var(--bg-2)',
+                    textAlign: 'left',
+                  }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: pdfModel === m.id ? 'var(--accent)' : 'var(--ink-0)' }}>
+                    {m.label}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}>
+                    {m.provider} · {m.badge}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Step 2: Sheet selector ── */}
         {step === 'sheet' && (
           <div>
@@ -507,6 +545,7 @@ export default function ImportModal({ onClose, onSave }) {
             {stats.isPdf && (
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
                 <strong style={{ color: 'var(--accent)' }}>✦ AI-parsed PDF</strong>
+                {' · '}{PDF_MODELS.find(m => m.id === pdfModel)?.label || 'AI'}
                 {' · '}{stats.total} transactions extracted — review before importing
               </div>
             )}
