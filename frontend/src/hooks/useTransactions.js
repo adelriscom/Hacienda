@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 
 function computeTag(t) {
-  if (t.status === 'ghost')     return { kind: 'ghost',   key: 'ghost' }
-  if (t.status === 'review')    return { kind: 'warn',    key: 'review' }
-  if (t.status === 'duplicate') return { kind: 'warn',    key: 'duplicate' }
-  if (t.status === 'match')     return { kind: 'ok',      key: 'cleared' }
-  if (t.type   === 'income')    return { kind: 'income',  key: 'income' }
-  if (t.type   === 'transfer')  return { kind: 'ok',      key: 'transfer' }
-  if (t.is_recurring)           return { kind: 'ok',      key: 'recurring' }
+  if (t.status === 'ghost')     return { kind: 'ghost',    key: 'ghost' }
+  if (t.status === 'review')    return { kind: 'warn',     key: 'review' }
+  if (t.status === 'duplicate') return { kind: 'warn',     key: 'duplicate' }
+  if (t.status === 'match')     return { kind: 'ok',       key: 'cleared' }
+  if (t.type   === 'income')    return { kind: 'income',   key: 'income' }
+  if (t.type   === 'transfer')  return { kind: 'transfer', key: 'transfer' }
+  if (t.is_recurring)           return { kind: 'ok',       key: 'recurring' }
   return { kind: 'pending', key: 'pending' }
 }
 
@@ -32,7 +32,26 @@ export function useTransactions() {
     if (error) {
       setError(error)
     } else {
-      setTransactions((data || []).map(t => ({ ...t, tag: computeTag(t) })))
+      // Build transfer-group lookup so each leg can reference its partner
+      const groupMap = new Map()
+      ;(data || []).forEach(t => {
+        if (t.transfer_group_id) {
+          const list = groupMap.get(t.transfer_group_id) || []
+          list.push(t)
+          groupMap.set(t.transfer_group_id, list)
+        }
+      })
+      setTransactions((data || []).map(t => {
+        const partner = t.transfer_group_id
+          ? (groupMap.get(t.transfer_group_id) || []).find(p => p.id !== t.id)
+          : null
+        return {
+          ...t,
+          partner_id:      partner?.id      || null,
+          partner_account: partner?.account || null,
+          tag: computeTag(t),
+        }
+      }))
     }
     setLoading(false)
   }, [isFamily, myUserId])
@@ -68,11 +87,17 @@ export function useTransactions() {
     await load()
   }
 
+  async function deleteTransactionPair(id1, id2) {
+    const { error } = await supabase.from('transactions').delete().in('id', [id1, id2])
+    if (error) throw error
+    await load()
+  }
+
   async function updateTransactions(ids, values) {
     const { error } = await supabase.from('transactions').update(values).in('id', ids)
     if (error) throw error
     await load()
   }
 
-  return { transactions, loading, error, refresh: load, addTransaction, addTransactions, updateTransaction, updateTransactions, deleteTransaction }
+  return { transactions, loading, error, refresh: load, addTransaction, addTransactions, updateTransaction, updateTransactions, deleteTransaction, deleteTransactionPair }
 }

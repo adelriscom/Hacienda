@@ -10,24 +10,25 @@ const today = () => new Date().toISOString().slice(0, 10)
 function initForm(tx, defaultPerson = 'Alexander') {
   if (!tx) return {
     occurred_at: today(), description: '', amount: '', type: 'expense',
-    account_id: '', category_id: '', person: defaultPerson,
+    account_id: '', to_account_id: '', category_id: '', person: defaultPerson,
     notes: '', is_recurring: false, status: 'match',
   }
   return {
-    occurred_at:  new Date(tx.occurred_at).toISOString().slice(0, 10),
-    description:  tx.description || '',
-    amount:       Math.abs(tx.amount).toString(),
-    type:         tx.type || 'expense',
-    account_id:   tx.account_id || '',
-    category_id:  tx.category_id || '',
-    person:       tx.person || defaultPerson,
-    notes:        tx.notes || '',
-    is_recurring: tx.is_recurring || false,
-    status:       tx.status || 'review',
+    occurred_at:    new Date(tx.occurred_at).toISOString().slice(0, 10),
+    description:    tx.description || '',
+    amount:         Math.abs(tx.amount).toString(),
+    type:           tx.type || 'expense',
+    account_id:     tx.account_id || '',
+    to_account_id:  '',
+    category_id:    tx.category_id || '',
+    person:         tx.person || defaultPerson,
+    notes:          tx.notes || '',
+    is_recurring:   tx.is_recurring || false,
+    status:         tx.status || 'review',
   }
 }
 
-export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelete, transaction, defaults }) {
+export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpdate, onDelete, onDeletePair, transaction, defaults }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { t } = useTranslation()
@@ -49,11 +50,13 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
     }
     setSaving(true); setError(null)
     try {
+      const occurred_at  = new Date(form.occurred_at + 'T12:00:00').toISOString()
+      const absAmount    = Math.abs(parseFloat(form.amount))
       const signedAmount = form.type === 'expense' || form.type === 'transfer'
-        ? -Math.abs(parseFloat(form.amount))
-        :  Math.abs(parseFloat(form.amount))
+        ? -absAmount : absAmount
+
       const payload = {
-        occurred_at:  new Date(form.occurred_at + 'T12:00:00').toISOString(),
+        occurred_at,
         description:  form.description,
         amount:       signedAmount,
         type:         form.type,
@@ -64,8 +67,30 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
         is_recurring: form.is_recurring,
         status:       isEdit ? form.status : 'match',
       }
-      if (isEdit) await onUpdate(transaction.id, payload)
-      else await onSave(payload)
+
+      if (isEdit) {
+        await onUpdate(transaction.id, payload)
+      } else if (form.type === 'transfer' && form.to_account_id && onSavePair) {
+        // Create both legs linked by a shared transfer_group_id
+        const transfer_group_id = crypto.randomUUID()
+        const outgoing = { ...payload, transfer_group_id }
+        const incoming = {
+          occurred_at,
+          description:       form.description,
+          amount:            absAmount,
+          type:              'transfer',
+          account_id:        form.to_account_id,
+          category_id:       null,
+          person:            form.person,
+          notes:             form.notes || null,
+          is_recurring:      false,
+          status:            'match',
+          transfer_group_id,
+        }
+        await onSavePair([outgoing, incoming])
+      } else {
+        await onSave(payload)
+      }
       onClose()
     } catch (err) {
       setError(err.message)
@@ -77,7 +102,11 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
   async function handleDelete() {
     setDeleting(true); setError(null)
     try {
-      await onDelete(transaction.id)
+      if (transaction.partner_id && onDeletePair) {
+        await onDeletePair(transaction.id, transaction.partner_id)
+      } else {
+        await onDelete(transaction.id)
+      }
       onClose()
     } catch (err) {
       setError(err.message)
@@ -126,17 +155,33 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
               </div>
             </div>
 
-            {form.type === 'transfer' && (
+            {/* Transfer: show paired partner when editing, or From/To pickers when creating */}
+            {form.type === 'transfer' && isEdit && transaction.partner_account && (
               <div className="span-2" style={{
-                display: 'flex', gap: 10, alignItems: 'flex-start',
+                display: 'flex', gap: 10, alignItems: 'center',
                 background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.25)',
-                borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5,
+                borderRadius: 8, padding: '10px 12px', fontSize: 12, color: 'var(--ink-1)',
               }}>
-                <span style={{ fontSize: 15, flexShrink: 0 }}>💡</span>
-                <span>
-                  Record only the <strong>outgoing</strong> side here (e.g. from Chequing).
-                  Do <strong>not</strong> record the receiving account as income — that would count the money twice.
-                </span>
+                <span style={{ fontSize: 14 }}>⇄</span>
+                <span>Paired with <strong>{transaction.partner_account.name}</strong> — both legs will be deleted together.</span>
+              </div>
+            )}
+            {form.type === 'transfer' && !isEdit && (
+              <div className="form-field span-2">
+                <label htmlFor="tx-to-account">To account <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 400 }}>(optional — links both legs)</span></label>
+                <select id="tx-to-account" value={form.to_account_id} onChange={e => set('to_account_id', e.target.value)}>
+                  <option value="">Leave unlinked</option>
+                  {cadAccounts.length > 0 && (
+                    <optgroup label="CAD">
+                      {cadAccounts.filter(a => a.id !== form.account_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </optgroup>
+                  )}
+                  {copAccounts.length > 0 && (
+                    <optgroup label="COP">
+                      {copAccounts.filter(a => a.id !== form.account_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
               </div>
             )}
 
@@ -159,7 +204,7 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             </div>
 
             <div className="form-field">
-              <label htmlFor="tx-account">{t('newTx.account')}</label>
+              <label htmlFor="tx-account">{form.type === 'transfer' ? 'From account' : t('newTx.account')}</label>
               <select id="tx-account" name="account_id" value={form.account_id} onChange={e => set('account_id', e.target.value)}>
                 <option value="">{t('newTx.accountSelect')}</option>
                 {cadAccounts.length > 0 && (
@@ -242,7 +287,7 @@ export default function NewTransactionModal({ onClose, onSave, onUpdate, onDelet
             <button type="button" className="btn ghost"
               style={{ marginRight: 'auto', color: 'var(--neg)' }}
               onClick={handleDelete} disabled={deleting}>
-              {deleting ? '…' : t('newTx.confirmDelete')}
+              {deleting ? '…' : transaction.partner_id ? 'Delete both legs?' : t('newTx.confirmDelete')}
             </button>
           )}
           <button type="button" className="btn ghost" onClick={onClose}>{t('newTx.cancel')}</button>

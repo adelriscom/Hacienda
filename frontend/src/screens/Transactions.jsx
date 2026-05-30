@@ -35,7 +35,7 @@ const selStyle = (active) => ({
 })
 
 export default function Transactions({ type }) {
-  const { transactions, loading, addTransaction, addTransactions, updateTransaction, updateTransactions, deleteTransaction } = useTransactions()
+  const { transactions, loading, addTransaction, addTransactions, updateTransaction, updateTransactions, deleteTransaction, deleteTransactionPair } = useTransactions()
   const { isFamily, myName } = useHousehold()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
@@ -382,7 +382,7 @@ export default function Transactions({ type }) {
       </div>
 
       {showNew && (
-        <NewTransactionModal onClose={() => setShowNew(false)} onSave={addTransaction} />
+        <NewTransactionModal onClose={() => setShowNew(false)} onSave={addTransaction} onSavePair={addTransactions} />
       )}
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onSave={addTransactions} />
@@ -393,6 +393,7 @@ export default function Transactions({ type }) {
           onClose={() => setEditingTx(null)}
           onUpdate={updateTransaction}
           onDelete={deleteTransaction}
+          onDeletePair={deleteTransactionPair}
         />
       )}
     </>
@@ -443,7 +444,18 @@ function TxRow({ t: tx, selected, onToggle, onEdit, onStatusToggle }) {
       </div>
       <div className="tx-col-acct">{tx.account?.name}</div>
       <div className="tx-col-tag" onClick={e => e.stopPropagation()}>
-        {tx.tag && (
+        {tx.type === 'transfer' ? (
+          <span
+            className={`chip tag-transfer ${tx.partner_account ? 'tag-transfer-linked' : ''}`}
+            title="Edit transaction"
+            style={{ cursor: 'pointer', transition: 'opacity .15s' }}
+            onClick={() => onEdit(tx)}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.65'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            ⇄ {tx.partner_account?.name || t('transactions.tags.transfer')}
+          </span>
+        ) : tx.tag ? (
           <span
             className={`chip tag-${tx.tag.kind}`}
             title="Edit transaction"
@@ -458,7 +470,7 @@ function TxRow({ t: tx, selected, onToggle, onEdit, onStatusToggle }) {
             {tx.tag.kind === 'income' && <Icon name="income" size={10} />}
             {t('transactions.tags.' + tx.tag.key)}
           </span>
-        )}
+        ) : null}
       </div>
       <div className="tx-col-amt num" style={{ color: tx.amount > 0 ? 'var(--pos)' : 'var(--ink-0)' }}>
         {tx.amount > 0 ? '+' : '−'}${Math.abs(tx.amount).toFixed(2)}
