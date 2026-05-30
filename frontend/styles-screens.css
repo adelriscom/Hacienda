@@ -584,9 +584,26 @@
   /* Action button: second row right */
   .tx-col-act { grid-column: 4; grid-row: 1 / 3; align-self: center; }
 
-  /* Budget cards stack */
-  .budget-grid { grid-template-columns: 1fr !important; }
+  /* Budget envelope grid: 2-col on mobile (was 3-col; also fixes stale .budget-grid ref) */
+  .envelope-grid { grid-template-columns: 1fr 1fr !important; }
 
-  /* Coverage items in reconciliation */
+  /* Budget overview: stack the pace chart below the totals */
+  .budget-overview { grid-template-columns: 1fr !important; gap: 16px !important; }
+
+  /* Coverage strip: 2×2 instead of 4 in a row */
+  .coverage-strip { grid-template-columns: 1fr 1fr !important; }
   .coverage-item { font-size: 11px; }
+
+  /* Calendar: stack sidebar below the calendar grid */
+  .cal-grid { grid-template-columns: 1fr !important; }
+  .cal-main { padding: 12px; }
+  .cal-cell { min-height: 52px; }
+  .cal-evt  { font-size: 9.5px; }
+
+  /* Review: stack suggestions below the review list */
+  .review-grid { grid-template-columns: 1fr !important; }
+
+  /* Reconciliation: stack the two panels */
+  .recon-grid { grid-template-columns: 1fr !important; }
+  .audit-card, .carry-card { grid-column: 1 !important; }
 }

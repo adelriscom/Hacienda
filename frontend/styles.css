@@ -533,6 +533,55 @@
 /* ──────────────── Hamburger (desktop: hidden) ──────────────── */
 .hamburger { display: none; }
 
+/* ──────────── Tablet: icon-only sidebar (769px – 1024px) ──────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+
+  /* Grid: narrow 64px rail instead of 240px */
+  .app-shell { grid-template-columns: 64px 1fr; }
+
+  .sidebar { padding: 14px 6px 0; }
+
+  /* Brand: logo only, centered */
+  .sb-brand { padding: 4px 0 18px; justify-content: center; gap: 0; }
+  .sb-brand > div:last-child { display: none; }
+
+  /* Hide section labels */
+  .sb-section { display: none; }
+
+  /* Nav items: icon centered, label hidden */
+  .sb-item { padding: 0; justify-content: center; height: 40px; gap: 0; }
+  .sb-item > span:not(.badge) { display: none; }
+  .sb-item .ico { width: 18px; height: 18px; opacity: 1; }
+
+  /* Active pill: shift left for narrow sidebar */
+  .sb-item.active::before { left: -6px; }
+
+  /* Badge: float top-right as a dot/number */
+  .sb-item .badge {
+    position: absolute;
+    top: 4px; right: 4px;
+    margin-left: 0;
+    min-width: 14px;
+    height: 14px;
+    font-size: 8px;
+    padding: 0 3px;
+    line-height: 14px;
+  }
+
+  /* Tools toggle: chevron only, centered */
+  .sb-tools-toggle { padding: 8px 0 4px !important; justify-content: center !important; }
+  .sb-tools-toggle > span { display: none; }
+
+  /* Household section: no room in icon-only mode */
+  .sb-bottom > div:not(.sb-user) { display: none; }
+
+  /* User card: avatar only, no info or signout */
+  .sb-user { padding: 10px 4px 6px; }
+  .sb-user-card { flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 8px 4px; }
+  .sb-user-info { display: none; }
+  .sb-signout   { display: none; }
+}
+
 /* ──────────────── Mobile ──────────────── */
 @media (max-width: 768px) {
 

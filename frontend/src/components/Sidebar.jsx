@@ -70,6 +70,7 @@ export default function Sidebar() {
         className={`sb-item ${active ? 'active' : ''}`}
         onClick={() => { navigate(it.path); close() }}
         aria-current={active ? 'page' : undefined}
+        title={it.label}
       >
         <Icon name={it.icon} className="ico" />
         <span>{it.label}</span>
@@ -96,6 +97,8 @@ export default function Sidebar() {
         <button
           onClick={toggleTools}
           aria-expanded={toolsOpen}
+          className="sb-tools-toggle"
+          title={t('nav.tools')}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             width: '100%', background: 'none', border: 'none', cursor: 'pointer',
