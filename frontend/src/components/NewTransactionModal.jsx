@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 import { useHousehold } from '../lib/household'
+import { useExchangeRate } from '../hooks/useExchangeRate'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -11,7 +12,7 @@ function initForm(tx, defaultPerson = 'Alexander') {
   if (!tx) return {
     occurred_at: today(), description: '', amount: '', type: 'expense',
     account_id: '', to_account_id: '', category_id: '', person: defaultPerson,
-    notes: '', is_recurring: false, status: 'match',
+    notes: '', is_recurring: false, status: 'match', exchange_rate: '',
   }
   return {
     occurred_at:    new Date(tx.occurred_at).toISOString().slice(0, 10),
@@ -25,6 +26,7 @@ function initForm(tx, defaultPerson = 'Alexander') {
     notes:          tx.notes || '',
     is_recurring:   tx.is_recurring || false,
     status:         tx.status || 'review',
+    exchange_rate:  tx.exchange_rate ? String(tx.exchange_rate) : '',
   }
 }
 
@@ -43,6 +45,37 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
+  // Exchange rate for the selected month (used as default for foreign-currency accounts)
+  const occurredMonth = form.occurred_at.slice(0, 7)
+  const { rate: monthlyRate } = useExchangeRate(occurredMonth)
+
+  // Detect selected account currency
+  const selectedAccount = accounts.find(a => a.id === form.account_id)
+  const isForeign = !!(selectedAccount && selectedAccount.currency !== 'CAD' && form.type !== 'transfer')
+  const foreignCurrency = selectedAccount?.currency || ''
+
+  // Auto-populate exchange_rate from monthly rate when a foreign account is selected
+  useEffect(() => {
+    if (isForeign && !form.exchange_rate && monthlyRate) {
+      set('exchange_rate', String(monthlyRate))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.account_id, monthlyRate, isForeign])
+
+  // Derived CAD equivalent (two-way: user can edit the CAD field to override rate)
+  const fxRate  = parseFloat(form.exchange_rate) || 0
+  const nativeAmt = parseFloat(form.amount) || 0
+  const cadEquiv = fxRate && nativeAmt ? (nativeAmt * fxRate).toFixed(2) : ''
+
+  function handleCadChange(cadStr) {
+    const cad = parseFloat(cadStr)
+    if (cad > 0 && nativeAmt > 0) {
+      set('exchange_rate', String(cad / nativeAmt))
+    } else if (!cadStr) {
+      set('exchange_rate', monthlyRate ? String(monthlyRate) : '')
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.description || !form.amount) {
@@ -57,15 +90,16 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
 
       const payload = {
         occurred_at,
-        description:  form.description,
-        amount:       signedAmount,
-        type:         form.type,
-        account_id:   form.account_id || null,
-        category_id:  form.category_id || null,
-        person:       form.person,
-        notes:        form.notes || null,
-        is_recurring: form.is_recurring,
-        status:       isEdit ? form.status : 'match',
+        description:   form.description,
+        amount:        signedAmount,
+        type:          form.type,
+        account_id:    form.account_id || null,
+        category_id:   form.category_id || null,
+        person:        form.person,
+        notes:         form.notes || null,
+        is_recurring:  form.is_recurring,
+        status:        isEdit ? form.status : 'match',
+        exchange_rate: isForeign && form.exchange_rate ? parseFloat(form.exchange_rate) : null,
       }
 
       if (isEdit) {
@@ -114,8 +148,17 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
     }
   }
 
-  const cadAccounts = accounts.filter(a => a.currency === 'CAD' && a.is_active)
-  const copAccounts = accounts.filter(a => a.currency === 'COP' && a.is_active)
+  // Group active accounts by currency (any number of currencies)
+  const accountsByCurrency = useMemo(() => {
+    const map = {}
+    accounts.filter(a => a.is_active).forEach(a => {
+      const cur = a.currency || 'CAD'
+      if (!map[cur]) map[cur] = []
+      map[cur].push(a)
+    })
+    return map
+  }, [accounts])
+  const currencyGroups = Object.entries(accountsByCurrency)
 
   const { parents, childrenOf, leafCategories } = useMemo(() => buildCategoryTree(categories), [categories])
 
@@ -171,16 +214,11 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
                 <label htmlFor="tx-to-account">To account <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 400 }}>(optional — links both legs)</span></label>
                 <select id="tx-to-account" value={form.to_account_id} onChange={e => set('to_account_id', e.target.value)}>
                   <option value="">Leave unlinked</option>
-                  {cadAccounts.length > 0 && (
-                    <optgroup label="CAD">
-                      {cadAccounts.filter(a => a.id !== form.account_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {currencyGroups.map(([cur, accts]) => (
+                    <optgroup key={cur} label={cur}>
+                      {accts.filter(a => a.id !== form.account_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </optgroup>
-                  )}
-                  {copAccounts.length > 0 && (
-                    <optgroup label="COP">
-                      {copAccounts.filter(a => a.id !== form.account_id).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </optgroup>
-                  )}
+                  ))}
                 </select>
               </div>
             )}
@@ -192,32 +230,52 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
             </div>
 
             <div className="form-field">
-              <label htmlFor="tx-amount">{t('newTx.amount')}</label>
+              <label htmlFor="tx-account">{form.type === 'transfer' ? 'From account' : t('newTx.account')}</label>
+              <select id="tx-account" name="account_id" value={form.account_id}
+                onChange={e => { set('account_id', e.target.value); set('exchange_rate', '') }}>
+                <option value="">{t('newTx.accountSelect')}</option>
+                {currencyGroups.map(([cur, accts]) => (
+                  <optgroup key={cur} label={cur}>
+                    {accts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            {/* Amount — full width when foreign currency (to make room for CAD equiv row) */}
+            <div className={`form-field${isForeign ? ' span-2' : ''}`}>
+              <label htmlFor="tx-amount">
+                {t('newTx.amount')}{isForeign && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 400 }}>in {foreignCurrency}</span>}
+              </label>
               <input id="tx-amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00"
                 value={form.amount} onChange={e => set('amount', e.target.value)} required />
             </div>
+
+            {/* CAD equivalent — shown only for foreign-currency accounts */}
+            {isForeign && (
+              <div className="span-2" style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: 'rgba(99,102,241,.06)', border: '1px solid rgba(99,102,241,.18)',
+                borderRadius: 8, padding: '8px 12px',
+              }}>
+                <span style={{ fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>≈ CAD</span>
+                <input
+                  type="number" min="0" step="0.01" placeholder="0.00"
+                  value={cadEquiv}
+                  onChange={e => handleCadChange(e.target.value)}
+                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 13,
+                    color: 'var(--ink-0)', outline: 'none', fontFamily: 'inherit' }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                  1 {foreignCurrency} = {fxRate ? fxRate.toFixed(6) : '—'} CAD
+                </span>
+              </div>
+            )}
 
             <div className="form-field span-2">
               <label htmlFor="tx-desc">{t('newTx.description')}</label>
               <input id="tx-desc" name="description" type="text" placeholder={t('newTx.descriptionPlaceholder')}
                 value={form.description} onChange={e => set('description', e.target.value)} required />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="tx-account">{form.type === 'transfer' ? 'From account' : t('newTx.account')}</label>
-              <select id="tx-account" name="account_id" value={form.account_id} onChange={e => set('account_id', e.target.value)}>
-                <option value="">{t('newTx.accountSelect')}</option>
-                {cadAccounts.length > 0 && (
-                  <optgroup label="CAD">
-                    {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </optgroup>
-                )}
-                {copAccounts.length > 0 && (
-                  <optgroup label="COP">
-                    {copAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </optgroup>
-                )}
-              </select>
             </div>
 
             <div className="form-field">

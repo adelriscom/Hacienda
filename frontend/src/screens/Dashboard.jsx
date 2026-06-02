@@ -50,7 +50,7 @@ export default function Dashboard() {
 
       let query = supabase
         .from('transactions')
-        .select('amount, type, occurred_at, category_id, category:categories(name, color), account:accounts(currency)')
+        .select('amount, type, occurred_at, category_id, exchange_rate, category:categories(name, color), account:accounts(currency)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .order('occurred_at', { ascending: true })
@@ -60,7 +60,11 @@ export default function Dashboard() {
         supabase.from('exchange_rates').select('cop_to_cad').eq('month', `${focusMonth}-01`).maybeSingle(),
       ])
       const rate  = rateRow ? Number(rateRow.cop_to_cad) : 0.00032
-      const toCAD = t => t.account?.currency === 'COP' ? t.amount * rate : t.amount
+      const toCAD = t => {
+        const cur = t.account?.currency
+        if (!cur || cur === 'CAD') return t.amount
+        return t.amount * (t.exchange_rate || rate)
+      }
 
       // Auto-jump: on first load if focusMonth is empty, jump to last month with data
       if (!didAutoJump.current) {

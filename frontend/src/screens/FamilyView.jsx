@@ -57,7 +57,11 @@ export default function FamilyView() {
   const [txs,    setTxs]    = useState([])
   const [loading, setLoading] = useState(false)
   const { rate } = useExchangeRate(focusMonth)
-  const toCAD = t => t.account?.currency === 'COP' ? t.amount * rate : t.amount
+  const toCAD = t => {
+    const cur = t.account?.currency
+    if (!cur || cur === 'CAD') return t.amount
+    return t.amount * (t.exchange_rate || rate)
+  }
 
   // Unique named persons from members
   const memberNames = useMemo(() => members.map(m => m.display_name), [members])
@@ -71,7 +75,7 @@ export default function FamilyView() {
       const { end }   = monthRange(focusMonth)
       const { data } = await supabase
         .from('transactions')
-        .select('occurred_at, amount, type, category_id, person, status, category:categories(name, color), account:accounts(currency)')
+        .select('occurred_at, amount, type, category_id, person, status, exchange_rate, category:categories(name, color), account:accounts(currency)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .neq('type', 'transfer')
