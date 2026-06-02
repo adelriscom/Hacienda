@@ -50,12 +50,17 @@ export default function Dashboard() {
 
       let query = supabase
         .from('transactions')
-        .select('amount, type, occurred_at, category_id, category:categories(name, color)')
+        .select('amount, type, occurred_at, category_id, category:categories(name, color), account:accounts(currency)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .order('occurred_at', { ascending: true })
       if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
-      const { data: txs } = await query
+      const [{ data: txs }, { data: rateRow }] = await Promise.all([
+        query,
+        supabase.from('exchange_rates').select('cop_to_cad').eq('month', `${focusMonth}-01`).maybeSingle(),
+      ])
+      const rate  = rateRow ? Number(rateRow.cop_to_cad) : 0.00032
+      const toCAD = t => t.account?.currency === 'COP' ? t.amount * rate : t.amount
 
       // Auto-jump: on first load if focusMonth is empty, jump to last month with data
       if (!didAutoJump.current) {
@@ -88,16 +93,16 @@ export default function Dashboard() {
       const cur  = txs.filter(t => t.occurred_at >= curStart && t.occurred_at < curEnd)
       const prev = txs.filter(t => t.occurred_at >= prevStart && t.occurred_at < curStart)
 
-      const income   = cur.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0)
-      const expenses = cur.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
-      const prevExp  = prev.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
+      const income   = cur.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + toCAD(t), 0)
+      const expenses = cur.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(toCAD(t)), 0)
+      const prevExp  = prev.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(toCAD(t)), 0)
       const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
       const catMap = {}
       cur.filter(t => t.amount < 0 && t.type !== 'transfer' && t.category).forEach(t => {
         const k = t.category.name
         if (!catMap[k]) catMap[k] = { name: k, color: t.category.color || '#94a3b8', amount: 0 }
-        catMap[k].amount += Math.abs(t.amount)
+        catMap[k].amount += Math.abs(toCAD(t))
       })
       const topCats    = Object.values(catMap).sort((a, b) => b.amount - a.amount).slice(0, 6)
       const totalCat   = topCats.reduce((s, c) => s + c.amount, 0)
@@ -112,8 +117,8 @@ export default function Dashboard() {
         const mTxs = txs.filter(t => t.occurred_at >= ms && t.occurred_at < me)
         months.push({
           label:    fmtMonthShort(ym),
-          income:   mTxs.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0),
-          expenses: mTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0),
+          income:   mTxs.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + toCAD(t), 0),
+          expenses: mTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(toCAD(t)), 0),
           current:  i === 0,
         })
       }
