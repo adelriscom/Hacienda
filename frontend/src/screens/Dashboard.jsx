@@ -48,17 +48,26 @@ export default function Dashboard() {
       const start = new Date(oy, om - 1, 1).toISOString()
       const end   = new Date(fy, fm, 1).toISOString()
 
-      let query = supabase
-        .from('transactions')
-        .select('amount, type, occurred_at, category_id, exchange_rate, category:categories(name, color), account:accounts(currency)')
-        .gte('occurred_at', start)
-        .lt('occurred_at', end)
-        .order('occurred_at', { ascending: true })
-      if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
-      const [{ data: txs }, { data: rateRow }] = await Promise.all([
-        query,
+      const buildQuery = (withFx) => {
+        const cols = withFx
+          ? 'amount, type, occurred_at, category_id, exchange_rate, category:categories(name, color), account:accounts(currency)'
+          : 'amount, type, occurred_at, category_id, category:categories(name, color), account:accounts(currency)'
+        let q = supabase.from('transactions').select(cols)
+          .gte('occurred_at', start).lt('occurred_at', end)
+          .order('occurred_at', { ascending: true })
+        if (!isFamily && myUserId) q = q.eq('user_id', myUserId)
+        return q
+      }
+      let [txResult, { data: rateRow }] = await Promise.all([
+        buildQuery(true),
         supabase.from('exchange_rates').select('cop_to_cad').eq('month', `${focusMonth}-01`).maybeSingle(),
       ])
+      // If exchange_rate column not in schema cache yet, fall back without it
+      if (txResult.error) {
+        console.warn('Dashboard query error, retrying without exchange_rate:', txResult.error.message)
+        txResult = await buildQuery(false)
+      }
+      const txs = txResult.data
       const rate  = rateRow ? Number(rateRow.cop_to_cad) : 0.00032
       const toCAD = t => {
         const cur = t.account?.currency

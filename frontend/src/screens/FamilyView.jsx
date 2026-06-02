@@ -73,16 +73,21 @@ export default function FamilyView() {
       const oldest = shiftMonth(focusMonth, -5)
       const { start } = monthRange(oldest)
       const { end }   = monthRange(focusMonth)
-      const { data } = await supabase
-        .from('transactions')
-        .select('occurred_at, amount, type, category_id, person, status, exchange_rate, category:categories(name, color), account:accounts(currency)')
-        .gte('occurred_at', start)
-        .lt('occurred_at', end)
-        .neq('type', 'transfer')
-        .neq('status', 'ghost')
-        .neq('status', 'duplicate')
+      const cols = (fx) => fx
+        ? 'occurred_at, amount, type, category_id, person, status, exchange_rate, category:categories(name, color), account:accounts(currency)'
+        : 'occurred_at, amount, type, category_id, person, status, category:categories(name, color), account:accounts(currency)'
+      let result = await supabase.from('transactions').select(cols(true))
+        .gte('occurred_at', start).lt('occurred_at', end).neq('type', 'transfer')
+        .neq('status', 'ghost').neq('status', 'duplicate')
         .order('occurred_at', { ascending: true })
-      setTxs(data || [])
+      if (result.error) {
+        console.warn('FamilyView query error, retrying without exchange_rate:', result.error.message)
+        result = await supabase.from('transactions').select(cols(false))
+          .gte('occurred_at', start).lt('occurred_at', end).neq('type', 'transfer')
+          .neq('status', 'ghost').neq('status', 'duplicate')
+          .order('occurred_at', { ascending: true })
+      }
+      setTxs(result.data || [])
       setLoading(false)
     }
     load()
