@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
+import { useExchangeRate } from '../hooks/useExchangeRate'
 
 function nowMonth() {
   const d = new Date()
@@ -55,6 +56,8 @@ export default function FamilyView() {
   const [focusMonth, setFocusMonth] = useState(nowMonth)
   const [txs,    setTxs]    = useState([])
   const [loading, setLoading] = useState(false)
+  const { rate } = useExchangeRate(focusMonth)
+  const toCAD = t => t.account?.currency === 'COP' ? t.amount * rate : t.amount
 
   // Unique named persons from members
   const memberNames = useMemo(() => members.map(m => m.display_name), [members])
@@ -68,7 +71,7 @@ export default function FamilyView() {
       const { end }   = monthRange(focusMonth)
       const { data } = await supabase
         .from('transactions')
-        .select('occurred_at, amount, type, category_id, person, status, category:categories(name, color)')
+        .select('occurred_at, amount, type, category_id, person, status, category:categories(name, color), account:accounts(currency)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
         .neq('type', 'transfer')
@@ -96,11 +99,12 @@ export default function FamilyView() {
     focusTxs.forEach(tx => {
       const person = tx.person || 'Shared'
       const bucket = stats[person] || (stats[person] = { income: 0, expenses: 0 })
-      if (tx.amount > 0) bucket.income   += tx.amount
-      else               bucket.expenses += Math.abs(tx.amount)
+      const cad = toCAD(tx)
+      if (cad > 0) bucket.income   += cad
+      else         bucket.expenses += Math.abs(cad)
     })
     return stats
-  }, [focusTxs, memberNames])
+  }, [focusTxs, memberNames, rate])
 
   const householdIncome   = Object.values(personStats).reduce((s, p) => s + p.income, 0)
   const householdExpenses = Object.values(personStats).reduce((s, p) => s + p.expenses, 0)
@@ -117,12 +121,13 @@ export default function FamilyView() {
       mTxs.forEach(tx => {
         const person = tx.person
         if (!person || !perPerson[person]) return
-        if (tx.amount > 0) perPerson[person].income   += tx.amount
-        else               perPerson[person].expenses += Math.abs(tx.amount)
+        const cad = toCAD(tx)
+        if (cad > 0) perPerson[person].income   += cad
+        else         perPerson[person].expenses += Math.abs(cad)
       })
       return { label: fmtMonthShort(ym), current: ym === focusMonth, perPerson }
     })
-  }, [txs, focusMonth, memberNames])
+  }, [txs, focusMonth, memberNames, rate])
 
   const maxBar = useMemo(() => {
     let max = 1
@@ -140,14 +145,15 @@ export default function FamilyView() {
     focusTxs.filter(tx => tx.amount < 0 && tx.category).forEach(tx => {
       const k = tx.category_id
       if (!map[k]) map[k] = { name: tx.category.name, color: tx.category.color || '#94a3b8', total: 0, byPerson: {} }
-      map[k].total += Math.abs(tx.amount)
+      const cad = Math.abs(toCAD(tx))
+      map[k].total += cad
       const p = tx.person || 'Shared'
-      map[k].byPerson[p] = (map[k].byPerson[p] || 0) + Math.abs(tx.amount)
+      map[k].byPerson[p] = (map[k].byPerson[p] || 0) + cad
     })
     const sorted = Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10)
     const grandTotal = sorted.reduce((s, c) => s + c.total, 0)
     return sorted.map(c => ({ ...c, pct: grandTotal ? Math.round(c.total / grandTotal * 100) : 0 }))
-  }, [focusTxs])
+  }, [focusTxs, rate])
 
   // Not in family mode — show prompt
   if (!household) {
