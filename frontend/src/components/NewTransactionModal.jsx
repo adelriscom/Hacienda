@@ -99,7 +99,7 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
         notes:         form.notes || null,
         is_recurring:  form.is_recurring,
         status:        isEdit ? form.status : 'match',
-        exchange_rate: isForeign && form.exchange_rate ? parseFloat(form.exchange_rate) : null,
+        ...(isForeign && form.exchange_rate ? { exchange_rate: parseFloat(form.exchange_rate) } : {}),
       }
 
       if (isEdit) {
