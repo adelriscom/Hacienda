@@ -60,6 +60,7 @@ export default function Reports() {
         .select('occurred_at, amount, type, category_id, person, category:categories(name, color)')
         .gte('occurred_at', start)
         .lt('occurred_at', end)
+        .neq('type', 'transfer')
         .order('occurred_at', { ascending: true })
       if (!isFamily && myUserId) query = query.eq('user_id', myUserId)
 
@@ -105,10 +106,10 @@ export default function Reports() {
     [txs, pStart, pEnd]
   )
 
-  const income   = focusTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0)
-  const expenses = focusTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const income   = focusTxs.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0)
+  const expenses = focusTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
   const net      = income - expenses
-  const prevExp  = prevTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0)
+  const prevExp  = prevTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0)
   const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
   // 6-month trend
@@ -119,8 +120,8 @@ export default function Reports() {
       const mTxs = txs.filter(t => t.occurred_at >= start && t.occurred_at < end)
       return {
         label:    fmtMonthShort(ym),
-        income:   mTxs.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
-        expenses: mTxs.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0),
+        income:   mTxs.filter(t => t.amount > 0 && t.type !== 'transfer').reduce((s, t) => s + t.amount, 0),
+        expenses: mTxs.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(t.amount), 0),
         current:  ym === focusMonth,
       }
     })
@@ -139,7 +140,7 @@ export default function Reports() {
     const { childrenOf } = buildCategoryTree(categories)
     // Accumulate spending per leaf category
     const leafMap = {}
-    focusTxs.filter(tx => tx.amount < 0 && tx.category).forEach(tx => {
+    focusTxs.filter(tx => tx.amount < 0 && tx.type !== 'transfer' && tx.category).forEach(tx => {
       const k = tx.category_id
       if (!leafMap[k]) leafMap[k] = { name: tx.category.name, color: tx.category.color || '#94a3b8', amount: 0, count: 0, parent_id: catIdToCategory[k]?.parent_id || null }
       leafMap[k].amount += Math.abs(tx.amount)
@@ -174,7 +175,7 @@ export default function Reports() {
   // Person breakdown
   const personBreakdown = useMemo(() => {
     const map = { Alexander: 0, Marcela: 0, Shared: 0 }
-    focusTxs.filter(t => t.amount < 0).forEach(t => {
+    focusTxs.filter(t => t.amount < 0 && t.type !== 'transfer').forEach(t => {
       const p = t.person || 'Shared'
       if (p in map) map[p] += Math.abs(t.amount)
     })

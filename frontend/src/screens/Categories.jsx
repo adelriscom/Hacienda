@@ -21,12 +21,22 @@ export default function Categories() {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(null) // null | 'new' | category obj
   const [defaultParent, setDefaultParent] = useState(null) // pre-fill parent when clicking "Add subcategory"
+  const [closedIds, setClosedIds] = useState(() => new Set()) // empty = all open
 
   const { parents, childrenOf } = useMemo(() => buildCategoryTree(categories), [categories])
 
   function openNew(parentId = null) {
     setDefaultParent(parentId)
     setEditing('new')
+  }
+
+  function toggle(id) {
+    setClosedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   return (
@@ -42,34 +52,95 @@ export default function Categories() {
       ) : categories.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>{t('cat.empty')}</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {parents.map(parent => {
             const children = childrenOf[parent.id] || []
+            const isOpen = !closedIds.has(parent.id)
             return (
-              <div key={parent.id}>
-                {/* Parent card */}
-                <CategoryCard
-                  category={parent}
-                  isParent
-                  childCount={children.length}
-                  onEdit={setEditing}
-                  onAddChild={() => openNew(parent.id)}
-                  t={t}
-                />
-                {/* Children indented below */}
+              <div key={parent.id} style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--r-md)',
+                overflow: 'hidden',
+              }}>
+                {/* Parent header — click row to toggle when it has children */}
+                <div
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px',
+                    cursor: children.length > 0 ? 'pointer' : 'default',
+                    userSelect: 'none',
+                  }}
+                  onClick={() => children.length > 0 && toggle(parent.id)}
+                >
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                    background: `${parent.color || '#94a3b8'}22`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <div style={{ width: 13, height: 13, borderRadius: '50%', background: parent.color || '#94a3b8' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {parent.name}
+                      {children.length > 0 && (
+                        <span style={{ fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 400, marginLeft: 6 }}>
+                          {children.length} {t('cat.subcategories')}
+                        </span>
+                      )}
+                    </div>
+                    {parent.is_tax_deductible && (
+                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span>🍁</span><span>{parent.tax_line || t('cat.taxDeductible')}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                    <button className="icon-btn sm-btn" title={t('cat.addSubcategory')}
+                      onClick={e => { e.stopPropagation(); openNew(parent.id) }}>
+                      <Icon name="plus" size={12} />
+                    </button>
+                    <button className="icon-btn sm-btn" title={t('cat.modal.titleEdit')}
+                      onClick={e => { e.stopPropagation(); setEditing(parent) }}>
+                      <Icon name="edit" size={14} />
+                    </button>
+                    {children.length > 0 && (
+                      <span style={{
+                        fontSize: 14, color: 'var(--ink-3)', marginLeft: 4,
+                        display: 'inline-block', lineHeight: 1,
+                        transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                        transition: 'transform 0.2s ease',
+                      }}>▾</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Children — animated collapse */}
                 {children.length > 0 && (
-                  <div style={{ marginLeft: 28, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {children.map(child => (
-                      <CategoryCard
-                        key={child.id}
-                        category={child}
-                        isParent={false}
-                        childCount={0}
-                        onEdit={setEditing}
-                        onAddChild={null}
-                        t={t}
-                      />
-                    ))}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateRows: isOpen ? '1fr' : '0fr',
+                    transition: 'grid-template-rows 0.22s ease',
+                  }}>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{
+                        borderTop: '1px solid var(--line)',
+                        padding: '8px 14px 10px 14px',
+                        display: 'flex', flexDirection: 'column', gap: 6,
+                      }}>
+                        {children.map(child => (
+                          <CategoryCard
+                            key={child.id}
+                            category={child}
+                            isParent={false}
+                            childCount={0}
+                            onEdit={setEditing}
+                            onAddChild={null}
+                            t={t}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
