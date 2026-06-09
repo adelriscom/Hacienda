@@ -115,32 +115,24 @@ export default function Categories() {
                   </div>
                 </div>
 
-                {/* Children — animated collapse */}
-                {children.length > 0 && (
+                {/* Children — collapse/expand */}
+                {children.length > 0 && isOpen && (
                   <div style={{
-                    display: 'grid',
-                    gridTemplateRows: isOpen ? '1fr' : '0fr',
-                    transition: 'grid-template-rows 0.22s ease',
+                    borderTop: '1px solid var(--line)',
+                    padding: '8px 14px 10px 14px',
+                    display: 'flex', flexDirection: 'column', gap: 6,
                   }}>
-                    <div style={{ overflow: 'hidden' }}>
-                      <div style={{
-                        borderTop: '1px solid var(--line)',
-                        padding: '8px 14px 10px 14px',
-                        display: 'flex', flexDirection: 'column', gap: 6,
-                      }}>
-                        {children.map(child => (
-                          <CategoryCard
-                            key={child.id}
-                            category={child}
-                            isParent={false}
-                            childCount={0}
-                            onEdit={setEditing}
-                            onAddChild={null}
-                            t={t}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    {children.map(child => (
+                      <CategoryCard
+                        key={child.id}
+                        category={child}
+                        isParent={false}
+                        childCount={0}
+                        onEdit={setEditing}
+                        onAddChild={null}
+                        t={t}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
