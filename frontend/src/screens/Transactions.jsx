@@ -119,7 +119,7 @@ export default function Transactions({ type }) {
     .filter(tx => tx.occurred_at.startsWith(filterMonth))
     .filter(activeDef.test)
     .filter(tx => activePerson === 'all' || tx.person === activePerson)
-    .filter(tx => !filterCat  || tx.category_id === filterCat)
+    .filter(tx => !filterCat  || (filterCat === '__none__' ? !tx.category_id : tx.category_id === filterCat))
     .filter(tx => !filterAcct || tx.account_id  === filterAcct)
     .filter(tx => !filterDesc || tx.description.toLowerCase().includes(filterDesc.toLowerCase()))
 
@@ -249,6 +249,7 @@ export default function Transactions({ type }) {
 
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selStyle(!!filterCat)}>
           <option value="">{t('transactions.filterBtns.category')}</option>
+          <option value="__none__">— No category —</option>
           {uniqueCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
