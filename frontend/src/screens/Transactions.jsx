@@ -151,7 +151,7 @@ export default function Transactions({ type }) {
   async function applyBulk() {
     const patch = {}
     if (bulkVals.account_id)  patch.account_id  = bulkVals.account_id
-    if (bulkVals.category_id) patch.category_id = bulkVals.category_id
+    if (bulkVals.category_id) patch.category_id = bulkVals.category_id === '__none__' ? null : bulkVals.category_id
     if (bulkVals.person)      patch.person       = bulkVals.person
     if (bulkVals.status)      patch.status       = bulkVals.status
     if (!Object.keys(patch).length) return
@@ -322,6 +322,7 @@ export default function Transactions({ type }) {
           <select value={bulkVals.category_id} onChange={e => setBulk('category_id', e.target.value)}
             style={{ ...selStyle(!!bulkVals.category_id), height: 30, fontSize: 12 }}>
             <option value="">Category…</option>
+            <option value="__none__">— No category —</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
