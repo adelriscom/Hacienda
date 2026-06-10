@@ -5,6 +5,7 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
 import ImportModal from '../components/ImportModal'
+import AutoCategorizeModal from '../components/AutoCategorizeModal'
 import { useTransactions } from '../hooks/useTransactions'
 import { useHousehold } from '../lib/household'
 import { useAccounts } from '../hooks/useAccounts'
@@ -39,8 +40,9 @@ export default function Transactions({ type }) {
   const { isFamily, myName } = useHousehold()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
-  const [showNew, setShowNew]           = useState(false)
-  const [showImport, setShowImport]     = useState(false)
+  const [showNew, setShowNew]               = useState(false)
+  const [showImport, setShowImport]         = useState(false)
+  const [showAutoCat, setShowAutoCat]       = useState(false)
   const [editingTx, setEditingTx]       = useState(null)
   const [activeFilter, setActiveFilter] = useState(type || 'all')
   const [activePerson, setActivePerson] = useState('all')
@@ -200,6 +202,10 @@ export default function Transactions({ type }) {
         <button className="btn ghost sm topbar-secondary" onClick={exportCSV} disabled={filtered.length === 0}
           title={`Export ${filtered.length} transactions to CSV`}>
           <Icon name="download" size={12} /> CSV
+        </button>
+        <button className="btn ghost sm topbar-secondary" onClick={() => setShowAutoCat(true)}
+          title="Auto-categorize uncategorized transactions with AI">
+          ✨ Auto-cat
         </button>
         <button className="btn ghost sm topbar-secondary" onClick={() => setShowImport(true)}>
           <Icon name="upload" size={12} /> {t('transactions.importBtn')}
@@ -381,6 +387,15 @@ export default function Transactions({ type }) {
         }
       </div>
 
+      {showAutoCat && (
+        <AutoCategorizeModal
+          transactions={filtered}
+          onClose={() => setShowAutoCat(false)}
+          onApply={async (patches) => {
+            await Promise.all(patches.map(p => updateTransaction(p.id, { category_id: p.category_id })))
+          }}
+        />
+      )}
       {showNew && (
         <NewTransactionModal onClose={() => setShowNew(false)} onSave={addTransaction} onSavePair={addTransactions} />
       )}
