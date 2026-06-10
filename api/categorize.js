@@ -1,7 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk')
 
 const MODEL = 'claude-haiku-4-5-20251001'
-const BATCH  = 60 // transactions per AI call
+const BATCH  = 30 // transactions per AI call
 
 function buildPrompt(transactions, categories) {
   const catList = categories.map(c => `${c.id} → ${c.name}`).join('\n')
@@ -51,7 +51,7 @@ module.exports = async function handler(req, res) {
       const batch = transactions.slice(i, i + BATCH)
       const msg = await client.messages.create({
         model: MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
         messages: [{ role: 'user', content: buildPrompt(batch, categories) }],
       })
       const parsed = parseJson(msg.content[0].text)
