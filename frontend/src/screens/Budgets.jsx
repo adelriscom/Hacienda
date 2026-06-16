@@ -46,9 +46,9 @@ export default function Budgets() {
   const [editingRate, setEditingRate] = useState(false)
   const [rateInput, setRateInput]     = useState('')
 
-  const { budgets, spending, loading, addBudget, updateBudget, deleteBudget } = useBudgets(filterMonth)
+  const { budgets, spending, hasCop, loading, addBudget, updateBudget, deleteBudget } = useBudgets(filterMonth)
   const { categories } = useCategories()
-  const { rate: copToCAD, saveRate } = useExchangeRate(filterMonth)
+  const { rate: copToCAD, saveRate, inherited: rateInherited } = useExchangeRate(filterMonth)
 
   // Totals — everything converted to CAD
   const totalBudgetCAD = budgets.reduce((s, b) => {
@@ -66,7 +66,9 @@ export default function Budgets() {
   const monthPct = Math.round((dayNum / daysIn) * 100)
   const spentPct = totalBudgetCAD > 0 ? Math.round((totalSpentCAD / totalBudgetCAD) * 100) : 0
 
-  const hasCOP = budgets.some(b => b.currency === 'COP')
+  // Show the rate editor whenever COP is relevant this month: a COP budget exists,
+  // or there's any COP transaction (income or expense).
+  const hasCOP = budgets.some(b => b.currency === 'COP') || hasCop
 
   const { leafCategories } = useMemo(() => buildCategoryTree(categories), [categories])
   const budgetedCatIds = new Set(budgets.map(b => b.category_id))
@@ -140,6 +142,10 @@ export default function Budgets() {
                     <span>COP</span>
                     <Icon name="edit" size={10} />
                   </button>
+                )}
+                {rateInherited && !editingRate && (
+                  <span title="No rate saved for this month — showing the last saved rate. Click to set it."
+                    style={{ color: 'var(--warn)', fontSize: 11 }}>· not set this month</span>
                 )}
               </div>
             )}

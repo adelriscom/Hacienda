@@ -3,6 +3,7 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
+import { useExchangeRate } from '../hooks/useExchangeRate'
 
 export default function Settings() {
   const { household, members, myUserId, reload } = useHousehold()
@@ -251,8 +252,89 @@ export default function Settings() {
           </div>
         )}
 
+        {/* ── Exchange rate ─────────────────────────────────────────────── */}
+        <div style={{ height: 24 }} />
+        <SectionLabel>Exchange rate</SectionLabel>
+        <ExchangeRateCard />
+
       </div>
     </>
+  )
+}
+
+function monthKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta)
+  return monthKey(d)
+}
+function fmtMonth(ym) {
+  const [y, m] = ym.split('-')
+  return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })
+}
+
+// Canonical, always-available editor for the COP → CAD rate (per month, per user).
+// The Budgets screen has a contextual shortcut to the same `exchange_rates` table.
+function ExchangeRateCard() {
+  const [month, setMonth]     = useState(monthKey)
+  const [editing, setEditing] = useState(false)
+  const [input, setInput]     = useState('')
+  const { rate: copToCAD, saveRate, inherited, loading } = useExchangeRate(month)
+
+  function startEdit() {
+    setInput(Math.round(1 / copToCAD).toString())
+    setEditing(true)
+  }
+  async function commit() {
+    const cadPerCop = parseFloat(input)
+    if (cadPerCop > 0) await saveRate(1 / cadPerCop)
+    setEditing(false)
+  }
+
+  return (
+    <div className="card" style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>COP → CAD</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button className="btn ghost sm" style={{ padding: '0 8px' }} onClick={() => setMonth(m => shiftMonth(m, -1))}>←</button>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', minWidth: 116, textAlign: 'center' }}>{fmtMonth(month)}</span>
+          <button className="btn ghost sm" style={{ padding: '0 8px' }} onClick={() => setMonth(m => shiftMonth(m, 1))}>→</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink-1)' }}>
+        <span>1 CAD =</span>
+        {editing ? (
+          <>
+            <input
+              type="number" value={input} min="1" autoFocus
+              onChange={e => setInput(e.target.value)}
+              onBlur={commit}
+              onKeyDown={e => e.key === 'Enter' && commit()}
+              style={{ width: 100, fontSize: 14, padding: '4px 8px', borderRadius: 6,
+                border: '1px solid var(--accent)', background: 'var(--bg-2)', color: 'var(--ink-0)', outline: 'none' }}
+            />
+            <span>COP</span>
+          </>
+        ) : (
+          <button onClick={startEdit}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              color: 'var(--ink-0)', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span className="num">{loading ? '…' : Math.round(1 / copToCAD).toLocaleString('en-CA')}</span>
+            <span style={{ fontWeight: 400, color: 'var(--ink-2)' }}>COP</span>
+            <Icon name="edit" size={12} />
+          </button>
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: inherited ? 'var(--warn)' : 'var(--ink-3)', marginTop: 8 }}>
+        {inherited
+          ? 'No rate saved for this month — showing the most recent saved rate. Click the number to set it.'
+          : 'Saved for this month. Used to convert COP amounts to CAD across the app.'}
+      </div>
+    </div>
   )
 }
 

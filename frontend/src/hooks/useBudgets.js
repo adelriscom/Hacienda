@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export function useBudgets(month) {
   const [budgets,  setBudgets]  = useState([])
   const [spending, setSpending] = useState({})  // { category_id: { CAD: n, COP: n } }
+  const [hasCop,   setHasCop]   = useState(false) // any COP transaction (income or expense) this month
   const [loading,  setLoading]  = useState(true)
 
   const load = useCallback(async () => {
@@ -18,23 +19,26 @@ export function useBudgets(month) {
         .select('*, category:categories(name, color)')
         .eq('month', start),
       supabase.from('transactions')
-        .select('category_id, amount, account:accounts(currency)')
+        .select('category_id, amount, type, account:accounts(currency)')
         .gte('occurred_at', start)
-        .lt('occurred_at', monthEnd)
-        .eq('type', 'expense')
-        .lt('amount', 0),
+        .lt('occurred_at', monthEnd),
     ])
 
     setBudgets(budgetData || [])
 
     const spendMap = {}
+    let copSeen = false
     ;(txData || []).forEach(t => {
-      if (!t.category_id) return
       const currency = t.account?.currency || 'CAD'
-      if (!spendMap[t.category_id]) spendMap[t.category_id] = { CAD: 0, COP: 0 }
-      spendMap[t.category_id][currency] += Math.abs(t.amount)
+      if (currency === 'COP') copSeen = true   // any COP txn (income or expense)
+      // Spending map tracks categorized expenses only, per currency
+      if (t.type === 'expense' && t.amount < 0 && t.category_id) {
+        if (!spendMap[t.category_id]) spendMap[t.category_id] = { CAD: 0, COP: 0 }
+        spendMap[t.category_id][currency] += Math.abs(t.amount)
+      }
     })
     setSpending(spendMap)
+    setHasCop(copSeen)
     setLoading(false)
   }, [month])
 
@@ -66,5 +70,5 @@ export function useBudgets(month) {
     await load()
   }
 
-  return { budgets, spending, loading, addBudget, updateBudget, deleteBudget, refresh: load }
+  return { budgets, spending, hasCop, loading, addBudget, updateBudget, deleteBudget, refresh: load }
 }
