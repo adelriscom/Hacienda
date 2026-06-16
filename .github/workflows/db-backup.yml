@@ -1,0 +1,85 @@
+name: Nightly DB backup
+
+# Encrypted pg_dump of the Supabase public schema, committed to the orphan
+# `db-backups` branch. See docs/BACKUPS.md for setup and restore instructions.
+
+on:
+  schedule:
+    # 07:10 UTC daily ≈ 02:10 America/Toronto (EST) / 03:10 (EDT)
+    - cron: "10 7 * * *"
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  RETENTION: 30           # keep this many most-recent dumps on the branch
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump and encrypt
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          OUT="hacienda-${STAMP}.sql.gz.gpg"
+          /usr/lib/postgresql/17/bin/pg_dump \
+            --schema=public \
+            --no-owner --no-privileges \
+            --clean --if-exists \
+            "$SUPABASE_DB_URL" \
+          | gzip -9 \
+          | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                --passphrase "$BACKUP_PASSPHRASE" \
+                -o "$OUT"
+          echo "Created $OUT ($(du -h "$OUT" | cut -f1))"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Commit to db-backups branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Work in a clean checkout of the orphan branch (or create it).
+          mkdir -p /tmp/backups && mv "$OUT" /tmp/backups/
+          if git ls-remote --exit-code --heads origin db-backups >/dev/null 2>&1; then
+            git fetch origin db-backups
+            git checkout db-backups
+          else
+            git checkout --orphan db-backups
+            git rm -rf . >/dev/null 2>&1 || true
+            printf '# Encrypted database backups\n\nDo not edit by hand. See docs/BACKUPS.md to restore.\n' > README.md
+          fi
+
+          mkdir -p backups
+          mv "/tmp/backups/$OUT" "backups/$OUT"
+
+          # Prune: keep only the newest $RETENTION dumps.
+          ls -1t backups/*.sql.gz.gpg 2>/dev/null | tail -n +$((RETENTION + 1)) | xargs -r git rm --quiet
+
+          git add backups/ README.md
+          git commit -m "Backup $OUT" || { echo "Nothing to commit"; exit 0; }
+          git push origin db-backups
