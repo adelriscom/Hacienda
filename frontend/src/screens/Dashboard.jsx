@@ -5,6 +5,7 @@ import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import { useRecurring } from '../hooks/useRecurring'
+import { toBase, BASE_CURRENCY } from '../lib/currency'
 
 function nowMonth() {
   const d = new Date()
@@ -58,9 +59,12 @@ export default function Dashboard() {
         if (!isFamily && myUserId) q = q.eq('user_id', myUserId)
         return q
       }
-      let [txResult, { data: rateRow }] = await Promise.all([
+      let [txResult, { data: rateRows }] = await Promise.all([
         buildQuery(true),
-        supabase.from('exchange_rates').select('cop_to_cad').eq('month', `${focusMonth}-01`).maybeSingle(),
+        supabase.from('exchange_rates')
+          .select('currency_code, rate_to_base, month')
+          .lte('month', `${focusMonth}-01`)
+          .order('month', { ascending: true }),
       ])
       // If exchange_rate column not in schema cache yet, fall back without it
       if (txResult.error) {
@@ -68,11 +72,14 @@ export default function Dashboard() {
         txResult = await buildQuery(false)
       }
       const txs = txResult.data
-      const rate  = rateRow ? Number(rateRow.cop_to_cad) : 0.00032
+      // Effective rate per currency: latest saved rate on or before focusMonth
+      const rateMap = {}
+      ;(rateRows || []).forEach(r => { rateMap[r.currency_code] = Number(r.rate_to_base) })
       const toCAD = t => {
         const cur = t.account?.currency
-        if (!cur || cur === 'CAD') return t.amount
-        return t.amount * (t.exchange_rate || rate)
+        if (!cur || cur === BASE_CURRENCY) return t.amount
+        if (t.exchange_rate) return t.amount * t.exchange_rate  // exact rate at txn time
+        return toBase(t.amount, cur, rateMap)
       }
 
       // Auto-jump: on first load if focusMonth is empty, jump to last month with data

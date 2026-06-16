@@ -4,6 +4,7 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
 import { useAccounts } from '../hooks/useAccounts'
+import { CURRENCIES } from '../lib/currency'
 
 const TYPE_ICON = {
   checking:   'account',
@@ -343,8 +344,7 @@ function AccountModal({ account, onClose, onSave, t }) {
             <div className="form-field">
               <label>{t('acct.modal.currency')}</label>
               <select value={form.currency} onChange={e => set('currency', e.target.value)}>
-                <option value="CAD">CAD — Canadian Dollar</option>
-                <option value="COP">COP — Colombian Peso</option>
+                {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} — {c.label}</option>)}
               </select>
             </div>
 
