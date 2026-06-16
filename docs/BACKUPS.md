@@ -7,6 +7,10 @@ Two independent safety nets:
 2. **Schema rollback** — `down` migrations in `supabase/migrations/down/` that reverse
    each structural change.
 
+> **You do NOT need backups configured to use the app.** The app works fully without
+> them. Backups are an optional safety net so you can recover data if something goes
+> wrong. Setting them up is a one-time task you can do whenever — see below.
+
 ---
 
 ## 1. Data backups (automated)
@@ -19,16 +23,44 @@ are pruned automatically.
 Files are named `hacienda-<UTC-timestamp>.sql.gz.gpg` and are **encrypted** — useless
 without the passphrase, so financial data never sits in the repo in cleartext.
 
-### One-time setup
+### One-time setup (step by step)
 
-Add two repository secrets (GitHub → repo → Settings → Secrets and variables → Actions):
+You add **two secrets** in GitHub, then run the workflow once. ~5 minutes.
 
-| Secret | Value |
-|--------|-------|
-| `SUPABASE_DB_URL` | The Postgres connection string. Supabase Dashboard → Project Settings → **Database** → Connection string → **URI**. Use the direct connection (port 5432) and keep `?sslmode=require`. It contains your DB password — treat it as a secret. |
-| `BACKUP_PASSPHRASE` | A long random passphrase **you choose** to encrypt the dumps. Store it somewhere safe (password manager). **If you lose it, the backups are unrecoverable.** |
+**Step 1 — Get your database connection string (`SUPABASE_DB_URL`)**
 
-Then trigger the first run manually: Actions → *Nightly DB backup* → **Run workflow**.
+1. Open Supabase → your project → **Project Settings** (gear) → **Database**.
+2. Find the **Connection string** section and pick the **Session pooler** tab.
+   - ⚠️ **Use the Session pooler, NOT "Direct connection".** GitHub Actions runs on
+     IPv4 and Supabase's direct connection is IPv6-only, so the direct one will fail to
+     connect. The Session pooler is IPv4 and works with `pg_dump`.
+   - ⚠️ Do **not** use the **Transaction pooler** (port 6543) — it can't do `pg_dump`.
+3. Copy the URI. It looks like:
+   ```
+   postgresql://postgres.<your-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres
+   ```
+   Replace `[YOUR-PASSWORD]` with your database password (reset it on that same page if
+   you don't have it). Make sure it ends with `?sslmode=require` (add it if missing).
+
+**Step 2 — Choose an encryption passphrase (`BACKUP_PASSPHRASE`)**
+
+Pick a long random phrase (e.g. from a password manager). It encrypts every backup.
+**Save it somewhere safe — if you lose it, the backups can't be decrypted.**
+
+**Step 3 — Add both as GitHub secrets**
+
+GitHub → your repo → **Settings** → **Secrets and variables** → **Actions** →
+**New repository secret**. Create two, with these **exact** names:
+
+| Name | Value |
+|------|-------|
+| `SUPABASE_DB_URL` | the Session pooler URI from Step 1 |
+| `BACKUP_PASSPHRASE` | the passphrase from Step 2 |
+
+**Step 4 — Run it once to verify**
+
+GitHub → **Actions** tab → **Nightly DB backup** → **Run workflow**. It should finish
+green and create a `db-backups` branch with one encrypted file under `backups/`.
 
 > Note: GitHub disables scheduled workflows on a repo with no activity for 60 days.
 > The nightly commit to `db-backups` counts as activity, so this stays alive on its own.
@@ -36,7 +68,7 @@ Then trigger the first run manually: Actions → *Nightly DB backup* → **Run w
 ### Run a manual backup locally (optional)
 
 ```bash
-export SUPABASE_DB_URL="postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+export SUPABASE_DB_URL="postgresql://postgres.<ref>:[PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
 export BACKUP_PASSPHRASE="your-long-passphrase"
 ./scripts/db/backup-local.sh ./backups
 ```
@@ -54,7 +86,7 @@ export BACKUP_PASSPHRASE="your-long-passphrase"
      look in `backups/` (newest timestamp = latest).
 2. Restore it:
    ```bash
-   export SUPABASE_DB_URL="postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres?sslmode=require"
+   export SUPABASE_DB_URL="postgresql://postgres.<ref>:[PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require"
    export BACKUP_PASSPHRASE="your-long-passphrase"
    ./scripts/db/restore.sh backups/hacienda-<stamp>.sql.gz.gpg
    ```
