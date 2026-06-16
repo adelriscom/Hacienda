@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
-import { useExchangeRate } from '../hooks/useExchangeRate'
+import { useExchangeRates } from '../hooks/useExchangeRates'
+import { toBase, BASE_CURRENCY } from '../lib/currency'
 
 function nowMonth() {
   const d = new Date()
@@ -56,11 +57,12 @@ export default function FamilyView() {
   const [focusMonth, setFocusMonth] = useState(nowMonth)
   const [txs,    setTxs]    = useState([])
   const [loading, setLoading] = useState(false)
-  const { rate } = useExchangeRate(focusMonth)
+  const { rates } = useExchangeRates(focusMonth)
   const toCAD = t => {
     const cur = t.account?.currency
-    if (!cur || cur === 'CAD') return t.amount
-    return t.amount * (t.exchange_rate || rate)
+    if (!cur || cur === BASE_CURRENCY) return t.amount
+    if (t.exchange_rate) return t.amount * t.exchange_rate
+    return toBase(t.amount, cur, rates)
   }
 
   // Unique named persons from members
@@ -113,7 +115,7 @@ export default function FamilyView() {
       else         bucket.expenses += Math.abs(cad)
     })
     return stats
-  }, [focusTxs, memberNames, rate])
+  }, [focusTxs, memberNames, rates])
 
   const householdIncome   = Object.values(personStats).reduce((s, p) => s + p.income, 0)
   const householdExpenses = Object.values(personStats).reduce((s, p) => s + p.expenses, 0)
@@ -136,7 +138,7 @@ export default function FamilyView() {
       })
       return { label: fmtMonthShort(ym), current: ym === focusMonth, perPerson }
     })
-  }, [txs, focusMonth, memberNames, rate])
+  }, [txs, focusMonth, memberNames, rates])
 
   const maxBar = useMemo(() => {
     let max = 1
@@ -162,7 +164,7 @@ export default function FamilyView() {
     const sorted = Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10)
     const grandTotal = sorted.reduce((s, c) => s + c.total, 0)
     return sorted.map(c => ({ ...c, pct: grandTotal ? Math.round(c.total / grandTotal * 100) : 0 }))
-  }, [focusTxs, rate])
+  }, [focusTxs, rates])
 
   // Not in family mode — show prompt
   if (!household) {

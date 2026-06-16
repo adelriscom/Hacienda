@@ -8,6 +8,7 @@ import Icon from './Icon'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
 import { supabase } from '../lib/supabase'
+import { BASE_CURRENCY } from '../lib/currency'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc
 
@@ -237,8 +238,14 @@ export default function ImportModal({ onClose, onSave }) {
   const [newAcctNames, setNewAcctNames] = useState([])
   const fileRef = useRef()
 
-  const cadAccounts = accounts.filter(a => a.currency === 'CAD')
-  const copAccounts = accounts.filter(a => a.currency === 'COP')
+  // Group accounts by currency for the picker (base currency first)
+  const accountGroups = Object.entries(
+    accounts.reduce((acc, a) => {
+      const cur = a.currency || BASE_CURRENCY
+      ;(acc[cur] = acc[cur] || []).push(a)
+      return acc
+    }, {})
+  ).sort(([a], [b]) => (a === BASE_CURRENCY ? -1 : b === BASE_CURRENCY ? 1 : a.localeCompare(b)))
 
   const loadFile = useCallback(async (f) => {
     setError(null)
@@ -641,16 +648,11 @@ export default function ImportModal({ onClose, onSave }) {
                 <label>{t('import.defaultAccount')} {!stats.isSheet1 && t('import.defaultAccountNote')}</label>
                 <select value={defaultAcct} onChange={e => setDefaultAcct(e.target.value)}>
                   <option value="">{t('import.accountSelect')}</option>
-                  {cadAccounts.length > 0 && (
-                    <optgroup label="CAD">
-                      {cadAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {accountGroups.map(([cur, accts]) => (
+                    <optgroup key={cur} label={cur}>
+                      {accts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </optgroup>
-                  )}
-                  {copAccounts.length > 0 && (
-                    <optgroup label="COP">
-                      {copAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </optgroup>
-                  )}
+                  ))}
                 </select>
               </div>
               <div className="form-field">

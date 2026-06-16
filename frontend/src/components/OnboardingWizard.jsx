@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from './Modal'
 import Icon from './Icon'
+import { CURRENCIES } from '../lib/currency'
 
 const STEPS = ['welcome', 'account', 'done']
 
@@ -90,8 +91,7 @@ export default function OnboardingWizard({ onClose, onOpenImport, addAccount }) 
             <div className="form-field">
               <label htmlFor="ob-currency">Currency</label>
               <select id="ob-currency" name="currency" value={form.currency} onChange={e => set('currency', e.target.value)}>
-                <option value="CAD">CAD — Canadian Dollar</option>
-                <option value="COP">COP — Colombian Peso</option>
+                {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} — {c.label}</option>)}
               </select>
             </div>
             <div className="form-field span-2">

@@ -4,7 +4,8 @@ import Modal from './Modal'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories, buildCategoryTree } from '../hooks/useCategories'
 import { useHousehold } from '../lib/household'
-import { useExchangeRate } from '../hooks/useExchangeRate'
+import { useExchangeRates } from '../hooks/useExchangeRates'
+import { BASE_CURRENCY } from '../lib/currency'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -45,14 +46,14 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
-  // Exchange rate for the selected month (used as default for foreign-currency accounts)
-  const occurredMonth = form.occurred_at.slice(0, 7)
-  const { rate: monthlyRate } = useExchangeRate(occurredMonth)
-
   // Detect selected account currency
+  const occurredMonth = form.occurred_at.slice(0, 7)
+  const { rates } = useExchangeRates(occurredMonth)
   const selectedAccount = accounts.find(a => a.id === form.account_id)
-  const isForeign = !!(selectedAccount && selectedAccount.currency !== 'CAD' && form.type !== 'transfer')
+  const isForeign = !!(selectedAccount && selectedAccount.currency !== BASE_CURRENCY && form.type !== 'transfer')
   const foreignCurrency = selectedAccount?.currency || ''
+  // Rate for the selected account's currency this month (default for the FX field)
+  const monthlyRate = foreignCurrency ? rates[foreignCurrency] : undefined
 
   // Auto-populate exchange_rate from monthly rate when a foreign account is selected
   useEffect(() => {

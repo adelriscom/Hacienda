@@ -5,7 +5,8 @@ import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
 import { useBudgets } from '../hooks/useBudgets'
 import { useCategories, buildCategoryTree } from '../hooks/useCategories'
-import { useExchangeRate } from '../hooks/useExchangeRate'
+import { useExchangeRates } from '../hooks/useExchangeRates'
+import { toBase } from '../lib/currency'
 import { supabase } from '../lib/supabase'
 
 function nowMonth() {
@@ -48,15 +49,15 @@ export default function Budgets() {
 
   const { budgets, spending, hasCop, loading, addBudget, updateBudget, deleteBudget } = useBudgets(filterMonth)
   const { categories } = useCategories()
-  const { rate: copToCAD, saveRate, inherited: rateInherited } = useExchangeRate(filterMonth)
+  const { rates, inherited, saveRate } = useExchangeRates(filterMonth)
+  const copToCAD      = rates['COP']
+  const rateInherited = inherited['COP']
 
-  // Totals — everything converted to CAD
-  const totalBudgetCAD = budgets.reduce((s, b) => {
-    return s + (b.currency === 'COP' ? b.amount * copToCAD : b.amount)
-  }, 0)
+  // Totals — everything converted to the base currency (CAD)
+  const totalBudgetCAD = budgets.reduce((s, b) => s + toBase(b.amount, b.currency, rates), 0)
   const totalSpentCAD = budgets.reduce((s, b) => {
-    const sp = spending[b.category_id] || { CAD: 0, COP: 0 }
-    return s + sp.CAD + sp.COP * copToCAD
+    const sp = spending[b.category_id] || {}
+    return s + Object.entries(sp).reduce((ss, [cur, amt]) => ss + toBase(amt, cur, rates), 0)
   }, 0)
   const totalLeftCAD = totalBudgetCAD - totalSpentCAD
 
@@ -75,12 +76,12 @@ export default function Budgets() {
   const availableCats  = leafCategories.filter(c => !budgetedCatIds.has(c.id))
 
   function startEditRate() {
-    setRateInput(Math.round(1 / copToCAD).toString())
+    setRateInput(copToCAD ? Math.round(1 / copToCAD).toString() : '')
     setEditingRate(true)
   }
   async function commitRate() {
     const cadPerCOP = parseFloat(rateInput)
-    if (cadPerCOP > 0) await saveRate(1 / cadPerCOP)
+    if (cadPerCOP > 0) await saveRate('COP', 1 / cadPerCOP)
     setEditingRate(false)
   }
 
@@ -138,7 +139,7 @@ export default function Budgets() {
                     style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                       color: 'var(--ink-2)', fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 4 }}
                   >
-                    <span className="num">{Math.round(1 / copToCAD).toLocaleString('en-CA')}</span>
+                    <span className="num">{copToCAD ? Math.round(1 / copToCAD).toLocaleString('en-CA') : '—'}</span>
                     <span>COP</span>
                     <Icon name="edit" size={10} />
                   </button>
