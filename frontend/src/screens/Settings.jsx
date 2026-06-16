@@ -3,7 +3,8 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
-import { useExchangeRate } from '../hooks/useExchangeRate'
+import { useExchangeRates } from '../hooks/useExchangeRates'
+import { BASE_CURRENCY, CURRENCIES } from '../lib/currency'
 
 export default function Settings() {
   const { household, members, myUserId, reload } = useHousehold()
@@ -275,28 +276,30 @@ function fmtMonth(ym) {
   return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })
 }
 
-// Canonical, always-available editor for the COP → CAD rate (per month, per user).
-// The Budgets screen has a contextual shortcut to the same `exchange_rates` table.
+// Canonical, always-available editor for foreign-currency → base (CAD) rates,
+// per month and per user. The Budgets screen has a contextual shortcut for COP.
 function ExchangeRateCard() {
   const [month, setMonth]     = useState(monthKey)
-  const [editing, setEditing] = useState(false)
-  const [input, setInput]     = useState('')
-  const { rate: copToCAD, saveRate, inherited, loading } = useExchangeRate(month)
+  const [extra, setExtra]     = useState([])   // currencies the user added manually
+  const [accountCurrencies, setAccountCurrencies] = useState([])
+  const { rates, inherited, saveRate, loading } = useExchangeRates(month)
 
-  function startEdit() {
-    setInput(Math.round(1 / copToCAD).toString())
-    setEditing(true)
-  }
-  async function commit() {
-    const cadPerCop = parseFloat(input)
-    if (cadPerCop > 0) await saveRate(1 / cadPerCop)
-    setEditing(false)
-  }
+  useEffect(() => {
+    supabase.from('accounts').select('currency').then(({ data }) => {
+      const set = new Set((data || []).map(a => a.currency).filter(c => c && c !== BASE_CURRENCY))
+      setAccountCurrencies([...set])
+    })
+  }, [])
+
+  // Manage rates for: currencies used by accounts, currencies that already have a
+  // rate, and any the user added here.
+  const shown = [...new Set([...accountCurrencies, ...Object.keys(rates), ...extra])].sort()
+  const addable = CURRENCIES.filter(c => c.code !== BASE_CURRENCY && !shown.includes(c.code))
 
   return (
     <div className="card" style={{ padding: '16px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>COP → CAD</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>Rates → {BASE_CURRENCY}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button className="btn ghost sm" style={{ padding: '0 8px' }} onClick={() => setMonth(m => shiftMonth(m, -1))}>←</button>
           <span style={{ fontSize: 12, color: 'var(--ink-2)', minWidth: 116, textAlign: 'center' }}>{fmtMonth(month)}</span>
@@ -304,36 +307,82 @@ function ExchangeRateCard() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink-1)' }}>
-        <span>1 CAD =</span>
-        {editing ? (
-          <>
-            <input
-              type="number" value={input} min="1" autoFocus
-              onChange={e => setInput(e.target.value)}
-              onBlur={commit}
-              onKeyDown={e => e.key === 'Enter' && commit()}
-              style={{ width: 100, fontSize: 14, padding: '4px 8px', borderRadius: 6,
-                border: '1px solid var(--accent)', background: 'var(--bg-2)', color: 'var(--ink-0)', outline: 'none' }}
-            />
-            <span>COP</span>
-          </>
-        ) : (
-          <button onClick={startEdit}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              color: 'var(--ink-0)', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="num">{loading ? '…' : Math.round(1 / copToCAD).toLocaleString('en-CA')}</span>
-            <span style={{ fontWeight: 400, color: 'var(--ink-2)' }}>COP</span>
-            <Icon name="edit" size={12} />
-          </button>
-        )}
-      </div>
+      {shown.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          All your accounts are in {BASE_CURRENCY}. Add a currency below to set its rate.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {shown.map(code => (
+            <CurrencyRateRow key={code} code={code}
+              rate={rates[code]} inherited={inherited[code]} loading={loading}
+              onSave={r => saveRate(code, r)} />
+          ))}
+        </div>
+      )}
 
-      <div style={{ fontSize: 11, color: inherited ? 'var(--warn)' : 'var(--ink-3)', marginTop: 8 }}>
-        {inherited
-          ? 'No rate saved for this month — showing the most recent saved rate. Click the number to set it.'
-          : 'Saved for this month. Used to convert COP amounts to CAD across the app.'}
+      {addable.length > 0 && (
+        <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select defaultValue=""
+            onChange={e => { if (e.target.value) { setExtra(x => [...x, e.target.value]); e.target.value = '' } }}
+            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6,
+              border: '1px solid var(--line)', background: 'var(--bg-2)', color: 'var(--ink-1)' }}>
+            <option value="">+ Add currency…</option>
+            {addable.map(c => <option key={c.code} value={c.code}>{c.code} — {c.label}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12 }}>
+        Base currency is {BASE_CURRENCY}. Rates convert foreign amounts to {BASE_CURRENCY} across the app.
       </div>
+    </div>
+  )
+}
+
+function CurrencyRateRow({ code, rate, inherited, loading, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [input, setInput]     = useState('')
+
+  const hasRate      = rate != null && rate > 0
+  const unitsPerBase = hasRate ? 1 / rate : null   // foreign units per 1 base unit
+  const fmtUnits = u => u >= 100 ? Math.round(u).toLocaleString('en-CA') : u.toFixed(4)
+
+  function startEdit() {
+    setInput(unitsPerBase == null ? '' : (unitsPerBase >= 100 ? Math.round(unitsPerBase).toString() : String(unitsPerBase)))
+    setEditing(true)
+  }
+  async function commit() {
+    const perBase = parseFloat(input)
+    if (perBase > 0) await onSave(1 / perBase)
+    setEditing(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--ink-1)' }}>
+      <span style={{ minWidth: 38, fontWeight: 700, color: 'var(--ink-0)' }}>{code}</span>
+      <span style={{ color: 'var(--ink-2)' }}>1 {BASE_CURRENCY} =</span>
+      {editing ? (
+        <input
+          type="number" value={input} min="0" step="any" autoFocus
+          onChange={e => setInput(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => e.key === 'Enter' && commit()}
+          style={{ width: 110, fontSize: 14, padding: '4px 8px', borderRadius: 6,
+            border: '1px solid var(--accent)', background: 'var(--bg-2)', color: 'var(--ink-0)', outline: 'none' }}
+        />
+      ) : (
+        <button onClick={startEdit}
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            color: 'var(--ink-0)', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="num">{loading ? '…' : hasRate ? `${fmtUnits(unitsPerBase)} ${code}` : `set ${code} rate`}</span>
+          <Icon name="edit" size={12} />
+        </button>
+      )}
+      {!editing && hasRate && inherited && (
+        <span title="No rate saved for this month — showing the last saved rate"
+          style={{ color: 'var(--warn)', fontSize: 11 }}>· not set this month</span>
+      )}
     </div>
   )
 }

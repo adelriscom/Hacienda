@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 
 const DEFAULT_RATE = 0.00032  // ≈ 3,125 COP per 1 CAD — last-resort fallback only
 
+// COP → CAD convenience wrapper around the generalized `exchange_rates` table
+// (currency_code = 'COP'). Kept for screens that only deal with COP; new
+// multi-currency code should use useExchangeRates() instead.
 export function useExchangeRate(month) {
   const [rate, setRate]           = useState(DEFAULT_RATE)
   const [inherited, setInherited] = useState(false) // true when no rate is saved for `month`
@@ -10,38 +13,41 @@ export function useExchangeRate(month) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    const monthStr = `${month}-01`
 
-    // 1. Exact rate saved for this month
+    // Exact COP rate saved for this month
     const { data: exact } = await supabase
       .from('exchange_rates')
-      .select('cop_to_cad')
-      .eq('month', `${month}-01`)
+      .select('rate_to_base')
+      .eq('currency_code', 'COP')
+      .eq('month', monthStr)
       .maybeSingle()
     if (exact) {
-      setRate(Number(exact.cop_to_cad)); setInherited(false); setLoading(false); return
+      setRate(Number(exact.rate_to_base)); setInherited(false); setLoading(false); return
     }
 
-    // 2. Otherwise carry forward the most recent saved rate (keeps it "as current as
-    //    possible" instead of snapping back to a stale hard-coded default)
+    // Otherwise carry forward the most recent saved COP rate
     const { data: prior } = await supabase
       .from('exchange_rates')
-      .select('cop_to_cad')
-      .lte('month', `${month}-01`)
+      .select('rate_to_base')
+      .eq('currency_code', 'COP')
+      .lte('month', monthStr)
       .order('month', { ascending: false })
       .limit(1)
       .maybeSingle()
     if (prior) {
-      setRate(Number(prior.cop_to_cad)); setInherited(true); setLoading(false); return
+      setRate(Number(prior.rate_to_base)); setInherited(true); setLoading(false); return
     }
 
-    // 3. No prior rate (month precedes all saved rates) → newest one ever saved
+    // No prior COP rate → newest one ever saved
     const { data: newest } = await supabase
       .from('exchange_rates')
-      .select('cop_to_cad')
+      .select('rate_to_base')
+      .eq('currency_code', 'COP')
       .order('month', { ascending: false })
       .limit(1)
       .maybeSingle()
-    setRate(newest ? Number(newest.cop_to_cad) : DEFAULT_RATE)
+    setRate(newest ? Number(newest.rate_to_base) : DEFAULT_RATE)
     setInherited(true)
     setLoading(false)
   }, [month])
@@ -55,8 +61,8 @@ export function useExchangeRate(month) {
     const user_id = session?.user?.id
     const { error } = await supabase
       .from('exchange_rates')
-      .upsert([{ user_id, month: `${month}-01`, cop_to_cad: r }],
-              { onConflict: 'user_id,month' })
+      .upsert([{ user_id, month: `${month}-01`, currency_code: 'COP', rate_to_base: r }],
+              { onConflict: 'user_id,month,currency_code' })
     if (error) throw error
     setRate(r); setInherited(false)
   }
