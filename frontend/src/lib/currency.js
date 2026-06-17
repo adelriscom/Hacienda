@@ -27,6 +27,29 @@ export function toBase(amount, currency, rateMap) {
   return rate ? amount * rate : amount
 }
 
+// Build an effective { code: rate_to_base } map for `monthStr` from all rate rows.
+// Per currency: use the latest rate on or before the month (carry forward); if the
+// month precedes every saved rate, fall back to that currency's earliest saved rate
+// (carry backward) so months before the first saved rate are still converted instead
+// of showing raw foreign amounts.
+export function buildRateMap(rows, monthStr) {
+  const sorted = [...(rows || [])].sort((a, b) =>
+    a.month < b.month ? -1 : a.month > b.month ? 1 : 0)
+  const onBefore = {}   // latest rate with month <= target
+  const earliest = {}   // earliest rate overall (first seen, ascending)
+  for (const r of sorted) {
+    const code = r.currency_code
+    const rate = Number(r.rate_to_base)
+    if (!(code in earliest)) earliest[code] = rate
+    if (r.month <= monthStr) onBefore[code] = rate
+  }
+  const eff = {}
+  for (const code of new Set([...Object.keys(onBefore), ...Object.keys(earliest)])) {
+    eff[code] = code in onBefore ? onBefore[code] : earliest[code]
+  }
+  return eff
+}
+
 // Format an amount already expressed in the base currency.
 export function fmtBase(n) {
   return '$' + Number(n || 0).toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
