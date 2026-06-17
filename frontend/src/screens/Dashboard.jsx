@@ -5,6 +5,7 @@ import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import { useRecurring } from '../hooks/useRecurring'
+import { useCategories } from '../hooks/useCategories'
 import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
 
 function nowMonth() {
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [stats, setStats]           = useState(null)
   const [loading, setLoading]       = useState(true)
   const { isFamily, myUserId }      = useHousehold()
+  const { categories: allCategories } = useCategories()
   const didAutoJump = useRef(false)
   const navigate    = useNavigate()
   const { items: recurringItems }   = useRecurring()
@@ -116,10 +118,20 @@ export default function Dashboard() {
       const prevExp  = prev.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(toCAD(t)), 0)
       const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
+      // Roll subcategories up to their top-level (parent) category
+      const catById = {}
+      ;(allCategories || []).forEach(c => { catById[c.id] = c })
+      const rootCategory = t => {
+        const leaf = catById[t.category_id]
+        const root = leaf?.parent_id ? (catById[leaf.parent_id] || leaf) : leaf
+        return root || t.category   // fall back to the embedded category
+      }
+
       const catMap = {}
-      cur.filter(t => t.amount < 0 && t.type !== 'transfer' && t.category).forEach(t => {
-        const k = t.category.name
-        if (!catMap[k]) catMap[k] = { name: k, color: t.category.color || '#94a3b8', amount: 0 }
+      cur.filter(t => t.amount < 0 && t.type !== 'transfer' && (catById[t.category_id] || t.category)).forEach(t => {
+        const root = rootCategory(t)
+        const k = root.name
+        if (!catMap[k]) catMap[k] = { name: k, color: root.color || '#94a3b8', amount: 0 }
         catMap[k].amount += Math.abs(toCAD(t))
       })
       const topCats    = Object.values(catMap).sort((a, b) => b.amount - a.amount).slice(0, 6)
@@ -145,7 +157,7 @@ export default function Dashboard() {
       setLoading(false)
     }
     load()
-  }, [focusMonth, isFamily, myUserId])
+  }, [focusMonth, isFamily, myUserId, allCategories])
 
   const fmt  = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)
