@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { buildRateMap } from '../lib/currency'
 
 // Multi-currency rates for a given month, as a map { currency_code: rate_to_base }.
-// Each currency carries forward its most recent saved rate (so a month with no
-// explicit rate still converts), and `inherited[code]` flags when that happened.
+// Each currency uses its nearest saved rate (latest on/before the month, else the
+// earliest ever saved), so every month converts. `inherited[code]` flags when the
+// month has no rate of its own.
 export function useExchangeRates(month) {
   const [rates, setRates]         = useState({})   // effective rate per currency
   const [inherited, setInherited] = useState({})   // { code: true } when carried forward
@@ -13,19 +15,16 @@ export function useExchangeRates(month) {
     setLoading(true)
     const monthStr = `${month}-01`
 
-    // All rates up to and including this month; latest month wins per currency.
-    const { data: hist } = await supabase
+    // All saved rates; buildRateMap picks the nearest one per currency for this month.
+    const { data: all } = await supabase
       .from('exchange_rates')
       .select('currency_code, rate_to_base, month')
-      .lte('month', monthStr)
       .order('month', { ascending: true })
 
-    const effective = {}
-    const exactThisMonth = new Set()
-    ;(hist || []).forEach(r => {
-      effective[r.currency_code] = Number(r.rate_to_base)
-      if (r.month === monthStr) exactThisMonth.add(r.currency_code)
-    })
+    const effective = buildRateMap(all || [], monthStr)
+    const exactThisMonth = new Set(
+      (all || []).filter(r => r.month === monthStr).map(r => r.currency_code)
+    )
 
     const inh = {}
     Object.keys(effective).forEach(code => { inh[code] = !exactThisMonth.has(code) })

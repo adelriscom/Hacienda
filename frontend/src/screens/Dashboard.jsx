@@ -5,7 +5,7 @@ import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import { useRecurring } from '../hooks/useRecurring'
-import { toBase, BASE_CURRENCY } from '../lib/currency'
+import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
 
 function nowMonth() {
   const d = new Date()
@@ -63,7 +63,6 @@ export default function Dashboard() {
         buildQuery(true),
         supabase.from('exchange_rates')
           .select('currency_code, rate_to_base, month')
-          .lte('month', `${focusMonth}-01`)
           .order('month', { ascending: true }),
       ])
       // If exchange_rate column not in schema cache yet, fall back without it
@@ -72,9 +71,8 @@ export default function Dashboard() {
         txResult = await buildQuery(false)
       }
       const txs = txResult.data
-      // Effective rate per currency: latest saved rate on or before focusMonth
-      const rateMap = {}
-      ;(rateRows || []).forEach(r => { rateMap[r.currency_code] = Number(r.rate_to_base) })
+      // Effective rate per currency: nearest saved rate (carry forward, else earliest)
+      const rateMap = buildRateMap(rateRows || [], `${focusMonth}-01`)
       const toCAD = t => {
         const cur = t.account?.currency
         if (!cur || cur === BASE_CURRENCY) return t.amount
