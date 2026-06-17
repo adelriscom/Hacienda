@@ -8,13 +8,15 @@ const GROQ_MODELS      = new Set(['llama-3.3-70b-versatile', 'llama-3.1-70b-vers
 
 const DEFAULT_MODEL = 'claude-haiku-4-5-20251001'
 
-const PROMPT = (text) => `Extract every individual transaction from this bank statement text.
+const PROMPT = (text) => `Extract the account and every individual transaction from this bank statement text.
 
-Return a JSON array. Each object must have exactly these fields:
-- "date": ISO date "YYYY-MM-DD"
-- "description": merchant or payee name, cleaned up (remove trailing codes/numbers)
-- "amount": a number — NEGATIVE for money leaving (debit, purchase, withdrawal, payment, fee), POSITIVE for money coming in (credit, deposit, refund, interest earned)
-- "type": "expense", "income", or "transfer"
+Return a JSON object with exactly these two fields:
+- "account": the account or card name as it appears on the statement, including the bank and product (e.g. "RBC Signature No Limit Banking", "CIBC Dividend Visa", "Bancolombia Ahorros", "Davivienda Tarjeta de Crédito"). Keep it short — bank + product only, no account numbers. Use null if you cannot determine it.
+- "transactions": a JSON array where each object has exactly these fields:
+  - "date": ISO date "YYYY-MM-DD"
+  - "description": merchant or payee name, cleaned up (remove trailing codes/numbers)
+  - "amount": a number — NEGATIVE for money leaving (debit, purchase, withdrawal, payment, fee), POSITIVE for money coming in (credit, deposit, refund, interest earned)
+  - "type": "expense", "income", or "transfer"
 
 Rules:
 - Purchases, debits, withdrawals = negative amount, type "expense"
@@ -25,7 +27,7 @@ Rules:
 - Parse dates in any format (May 10 2025, 10/05/2025, 2025-05-10, etc.) → YYYY-MM-DD
 - Strip $ signs, commas, and spaces from amounts before converting to number
 
-Respond with ONLY the raw JSON array — no markdown code fences, no explanation, no commentary.
+Respond with ONLY the raw JSON object — no markdown code fences, no explanation, no commentary.
 
 Bank statement text:
 ${text.slice(0, 60000)}`
@@ -79,18 +81,28 @@ module.exports = async function handler(req, res) {
       raw = completion.choices[0]?.message?.content?.trim() || '[]'
     }
 
-    let transactions
+    let parsed
     try {
-      transactions = parseJson(raw)
+      parsed = parseJson(raw)
     } catch {
       return res.status(500).json({ error: 'AI returned invalid JSON — try a different model or PDF.', raw: raw.slice(0, 500) })
     }
 
-    if (!Array.isArray(transactions)) {
-      return res.status(500).json({ error: 'Expected a JSON array from AI.', raw: raw.slice(0, 200) })
+    // Accept both the new { account, transactions } object shape and the legacy
+    // bare-array shape (in case a model ignores the new instruction).
+    let transactions, account = null
+    if (Array.isArray(parsed)) {
+      transactions = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      transactions = parsed.transactions
+      account = typeof parsed.account === 'string' ? (parsed.account.trim() || null) : null
     }
 
-    return res.status(200).json({ transactions, model })
+    if (!Array.isArray(transactions)) {
+      return res.status(500).json({ error: 'Expected a JSON object with a transactions array from AI.', raw: raw.slice(0, 200) })
+    }
+
+    return res.status(200).json({ transactions, account, model })
 
   } catch (err) {
     console.error('parse-statement error:', err)

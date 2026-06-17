@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfjsWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -7,6 +7,7 @@ import Modal from './Modal'
 import Icon from './Icon'
 import { useAccounts } from '../hooks/useAccounts'
 import { useCategories } from '../hooks/useCategories'
+import { useTransactions } from '../hooks/useTransactions'
 import { supabase } from '../lib/supabase'
 import { BASE_CURRENCY } from '../lib/currency'
 
@@ -217,7 +218,17 @@ function parseSheet(ws, categories, accounts) {
 export default function ImportModal({ onClose, onSave }) {
   const { accounts } = useAccounts()
   const { categories, ensureCategories } = useCategories()
+  const { transactions: allTransactions } = useTransactions()
   const { t } = useTranslation()
+
+  // Few-shot examples for AI categorization: the household's own already-categorized
+  // transactions, so PDF rows are categorized using the same conventions.
+  const examples = useMemo(
+    () => (allTransactions || [])
+      .filter(tx => tx.category_id && tx.type !== 'transfer' && tx.description)
+      .map(tx => ({ description: tx.description, category_id: tx.category_id })),
+    [allTransactions]
+  )
 
   const [step, setStep]             = useState('upload')
   const [wb, setWb]                 = useState(null)
@@ -267,10 +278,16 @@ export default function ImportModal({ onClose, onSave }) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error || `Server error ${res.status}`)
         }
-        const { transactions } = await res.json()
+        const { transactions, account: detectedAccount } = await res.json()
         if (!Array.isArray(transactions) || transactions.length === 0) {
           throw new Error('No transactions found in this PDF. Try a different statement.')
         }
+
+        // Resolve the account the statement belongs to: match an existing account by
+        // name, otherwise flag it for auto-creation (same machinery as spreadsheet import).
+        const acctName    = (typeof detectedAccount === 'string' && detectedAccount.trim()) || ''
+        const matchedAcct = acctName ? matchName(acctName, accounts) : null
+
         const rows = transactions.map(tx => ({
           occurred_at:       new Date(((tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) ? tx.date : new Date().toISOString().slice(0, 10)) + 'T12:00:00').toISOString(),
           description:       String(tx.description || '').trim(),
@@ -278,15 +295,45 @@ export default function ImportModal({ onClose, onSave }) {
           type:              ['expense', 'income', 'transfer'].includes(tx.type) ? tx.type : 'expense',
           category_name:     '',
           category_id:       null,
-          account_name:      '',
+          account_name:      acctName,
           person:            '',
           notes:             null,
           is_recurring:      false,
           status:            'review',
           _cat_warn:         false,
-          _acct_new:         false,
-          _resolved_acct_id: null,
+          _acct_new:         !!acctName && !matchedAcct,
+          _resolved_acct_id: matchedAcct?.id || null,
         }))
+
+        // Inline AI categorization so PDF rows arrive pre-categorized (non-fatal: on
+        // failure rows stay uncategorized and can be set in the preview/auto-categorize).
+        if (categories.length > 0) {
+          setParsingMsg('Categorizing transactions…')
+          try {
+            const catRes = await fetch('/api/categorize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                transactions: rows.map((r, i) => ({ id: String(i), description: r.description, amount: r.amount, type: r.type })),
+                categories: categories.map(c => ({ id: c.id, name: c.name })),
+                examples,
+              }),
+            })
+            if (catRes.ok) {
+              const suggestions = await catRes.json()
+              if (Array.isArray(suggestions)) {
+                suggestions.forEach(s => {
+                  const idx = Number(s.id)
+                  if (rows[idx] && s.category_id) {
+                    rows[idx].category_id = s.category_id
+                    rows[idx]._cat_conf   = s.confidence
+                  }
+                })
+              }
+            }
+          } catch { /* leave rows uncategorized */ }
+        }
+
         const dates = rows.map(r => r.occurred_at.slice(0, 10)).filter(Boolean)
         let taggedRows = rows
         let dups = 0
@@ -307,13 +354,18 @@ export default function ImportModal({ onClose, onSave }) {
           }))
           dups = taggedRows.filter(r => r._isDup).length
         }
+        const catCount = taggedRows.filter(r => r.category_id).length
         setSelectedSheet('PDF')
-        setStats({ total: rows.length, isSheet1: false, isPdf: true, catMatched: 0, catUnmatched: 0, detectedHeaders: [] })
+        setStats({
+          total: rows.length, isSheet1: false, isPdf: true,
+          catMatched: catCount, catUnmatched: rows.length - catCount,
+          detectedHeaders: [], account: acctName,
+        })
         setRows(taggedRows)
         setPreview(taggedRows.slice(0, 15))
         setDupCount(dups)
         setSkipDups(dups > 0)
-        setNewAcctNames([])
+        setNewAcctNames(acctName && !matchedAcct ? [acctName] : [])
         setStep('preview')
       } catch (err) {
         setError(err.message)
@@ -341,7 +393,7 @@ export default function ImportModal({ onClose, onSave }) {
       }
     }
     reader.readAsArrayBuffer(f)
-  }, [accounts, categories]) // eslint-disable-line
+  }, [accounts, categories, examples]) // eslint-disable-line
 
   async function applySheet(workbook, sheetName) {
     const result = parseSheet(workbook.Sheets[sheetName], categories, accounts)
@@ -423,7 +475,7 @@ export default function ImportModal({ onClose, onSave }) {
       }
 
       const VALID_PERSONS = new Set(['Alexander', 'Marcela', 'Shared'])
-      const toInsert = activeRows.map(({ _cat_warn, _acct_new, _isDup, _resolved_acct_id, category_name, account_name, ...r }) => ({
+      const toInsert = activeRows.map(({ _cat_warn, _acct_new, _isDup, _cat_conf, _resolved_acct_id, category_name, account_name, ...r }) => ({
         ...r,
         category_id: r.category_id || (category_name ? catMap[category_name.toLowerCase()] : null) || null,
         account_id:  _resolved_acct_id
@@ -438,6 +490,19 @@ export default function ImportModal({ onClose, onSave }) {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Edit a row's category from the preview table (PDF rows). Preview is rows.slice(0,15)
+  // so the visible index maps 1:1 to the rows array index.
+  function setRowCategory(idx, catId) {
+    const apply = arr => {
+      if (!arr || !arr[idx]) return arr
+      const next = [...arr]
+      next[idx] = { ...next[idx], category_id: catId || null }
+      return next
+    }
+    setRows(apply)
+    setPreview(apply)
   }
 
   function reset() {
@@ -553,7 +618,9 @@ export default function ImportModal({ onClose, onSave }) {
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
                 <strong style={{ color: 'var(--accent)' }}>✦ AI-parsed PDF</strong>
                 {' · '}{PDF_MODELS.find(m => m.id === pdfModel)?.label || 'AI'}
-                {' · '}{stats.total} transactions extracted — review before importing
+                {' · '}{stats.total} transactions extracted
+                {stats.account && <> · account <strong style={{ color: 'var(--ink-1)' }}>{stats.account}</strong></>}
+                {' '}— review before importing
               </div>
             )}
 
@@ -577,15 +644,13 @@ export default function ImportModal({ onClose, onSave }) {
                 <div className="import-stat-num">{stats.total}</div>
                 <div className="import-stat-label">{t('import.statsTotal')}</div>
               </div>
-              {!stats.isPdf && (
-                <div className="import-stat">
-                  <div className="import-stat-num" style={{ color: stats.catUnmatched ? 'var(--warn)' : 'var(--pos)' }}>
-                    {stats.catMatched}
-                  </div>
-                  <div className="import-stat-label">{t('import.statsCatOk')}</div>
+              <div className="import-stat">
+                <div className="import-stat-num" style={{ color: stats.catUnmatched ? 'var(--warn)' : 'var(--pos)' }}>
+                  {stats.catMatched}
                 </div>
-              )}
-              {!stats.isPdf && stats.catUnmatched > 0 && (
+                <div className="import-stat-label">{t('import.statsCatOk')}</div>
+              </div>
+              {stats.catUnmatched > 0 && (
                 <div className="import-stat">
                   <div className="import-stat-num" style={{ color: 'var(--warn)' }}>{stats.catUnmatched}</div>
                   <div className="import-stat-label">{t('import.statsCatNo')}</div>
@@ -675,7 +740,7 @@ export default function ImportModal({ onClose, onSave }) {
                       <tr>
                         <th>{t('import.colDate')}</th>
                         <th>{t('import.colDesc')}</th>
-                        {!stats.isPdf && <th>{t('import.colCat')}</th>}
+                        <th>{t('import.colCat')}</th>
                         {!stats.isSheet1 && !stats.isPdf && <th>{t('import.colAcct')}</th>}
                         {!stats.isSheet1 && !stats.isPdf && <th>{t('import.colPerson')}</th>}
                         {stats.isPdf && <th>Type</th>}
@@ -687,7 +752,24 @@ export default function ImportModal({ onClose, onSave }) {
                         <tr key={i} className={r._isDup ? 'warn-row' : ''}>
                           <td>{new Date(r.occurred_at).toLocaleDateString('en-CA', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
                           <td>{r.description || '—'}</td>
-                          {!stats.isPdf && <td style={{ color: r._cat_warn ? 'var(--warn)' : undefined }}>{r.category_name || '—'}</td>}
+                          {stats.isPdf ? (
+                            <td>
+                              <select
+                                value={r.category_id || ''}
+                                onChange={e => setRowCategory(i, e.target.value)}
+                                style={{
+                                  fontSize: 11.5, borderRadius: 6, border: '1px solid var(--border)',
+                                  background: 'var(--bg-card)', color: r.category_id ? 'var(--ink-0)' : 'var(--ink-3)',
+                                  padding: '2px 6px', maxWidth: 150,
+                                }}
+                              >
+                                <option value="">{t('import.colCat')} —</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              </select>
+                            </td>
+                          ) : (
+                            <td style={{ color: r._cat_warn ? 'var(--warn)' : undefined }}>{r.category_name || '—'}</td>
+                          )}
                           {!stats.isSheet1 && !stats.isPdf && <td>{r.account_name || '—'}</td>}
                           {!stats.isSheet1 && !stats.isPdf && <td>{r.person || '—'}</td>}
                           {stats.isPdf && <td style={{ color: r.type === 'income' ? 'var(--pos)' : r.type === 'transfer' ? 'var(--accent)' : 'var(--ink-2)', fontSize: 11 }}>{r.type}</td>}

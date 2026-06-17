@@ -17,6 +17,7 @@ import ReviewShared from '../screens/Review'
 import AccountsScreen from '../screens/Accounts'
 import CategoriesScreen from '../screens/Categories'
 import ObligationsScreen from '../screens/Obligations'
+import GoalsScreen from '../screens/Goals'
 import SettingsScreen from '../screens/Settings'
 import FamilyViewScreen from '../screens/FamilyView'
 
@@ -82,6 +83,7 @@ function ShellInner() {
             <Route path="/accounts"     element={<AccountsScreen />} />
             <Route path="/categories"   element={<CategoriesScreen />} />
             <Route path="/obligations"  element={<ObligationsScreen />} />
+            <Route path="/goals"        element={<GoalsScreen />} />
             <Route path="/settings"     element={<SettingsScreen />} />
             <Route path="/family"       element={<FamilyViewScreen />} />
           </Routes>

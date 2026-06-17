@@ -38,6 +38,7 @@ export default function Sidebar() {
     { id: 'accounts',   path: '/accounts',   icon: 'account',    label: t('nav.accounts') },
     { id: 'categories', path: '/categories', icon: 'filter',     label: t('nav.categories') },
     { id: 'obligations',path: '/obligations',icon: 'trend-down', label: t('nav.obligations') },
+    { id: 'goals',      path: '/goals',      icon: 'piggy',      label: t('nav.goals') },
     { id: 'settings',   path: '/settings',   icon: 'cog',        label: t('nav.settings') },
   ]
 
