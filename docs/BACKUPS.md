@@ -7,9 +7,18 @@ Two independent safety nets:
 2. **Schema rollback** — `down` migrations in `supabase/migrations/down/` that reverse
    each structural change.
 
-> **You do NOT need backups configured to use the app.** The app works fully without
-> them. Backups are an optional safety net so you can recover data if something goes
-> wrong. Setting them up is a one-time task you can do whenever — see below.
+> **Status: backups are ACTIVE** (configured 2026-06-17). Both GitHub secrets are set
+> and the workflow runs nightly — check the **Actions** tab for run history. You do
+> **not** need to set this up again; the setup steps below are kept for reference and
+> disaster recovery only.
+
+> 🛑 **NEVER change `BACKUP_PASSPHRASE` once backups exist.** Each dump is encrypted
+> with the passphrase in effect when it ran. Rotating it makes every *existing*
+> encrypted backup undecryptable. **Before touching any backup secret, run
+> `gh secret list`** to see what's already configured. If you genuinely must rotate the
+> passphrase: keep the old one safe (you need it to decrypt old dumps), set the new one,
+> then trigger a fresh run so a current dump exists under the new key — and prune dumps
+> made under the old key to avoid mixing keys.
 
 ---
 
@@ -41,6 +50,9 @@ You add **two secrets** in GitHub, then run the workflow once. ~5 minutes.
    ```
    Replace `[YOUR-PASSWORD]` with your database password (reset it on that same page if
    you don't have it). Make sure it ends with `?sslmode=require` (add it if missing).
+   - ⚠️ Use an **alphanumeric-only** DB password. Symbols (especially `\`, `/`, `@`, `:`)
+     break the URI and the workflow's shell parsing — reset it to letters+digits in
+     Supabase if needed.
 
 **Step 2 — Choose an encryption passphrase (`BACKUP_PASSPHRASE`)**
 
