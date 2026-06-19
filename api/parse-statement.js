@@ -34,7 +34,17 @@ ${text.slice(0, 60000)}`
 
 function parseJson(raw) {
   const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-  return JSON.parse(clean)
+  try {
+    return JSON.parse(clean)
+  } catch {
+    // Model may have wrapped the JSON in prose — extract the outermost object/array.
+    const start = clean.search(/[[{]/)
+    const end   = Math.max(clean.lastIndexOf('}'), clean.lastIndexOf(']'))
+    if (start !== -1 && end > start) {
+      return JSON.parse(clean.slice(start, end + 1))
+    }
+    throw new Error('No JSON found in AI response')
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -58,7 +68,7 @@ module.exports = async function handler(req, res) {
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const message = await client.messages.create({
         model,
-        max_tokens: 4096,
+        max_tokens: 8192,  // long statements (e.g. 80+ txns) overflow 4096 → truncated JSON
         messages: [{ role: 'user', content: PROMPT(text) }],
       })
       raw = message.content[0]?.text?.trim() || '[]'
@@ -76,7 +86,7 @@ module.exports = async function handler(req, res) {
       const completion = await groq.chat.completions.create({
         model,
         messages: [{ role: 'user', content: PROMPT(text) }],
-        max_tokens: 4096,
+        max_tokens: 8192,
       })
       raw = completion.choices[0]?.message?.content?.trim() || '[]'
     }
@@ -85,7 +95,7 @@ module.exports = async function handler(req, res) {
     try {
       parsed = parseJson(raw)
     } catch {
-      return res.status(500).json({ error: 'AI returned invalid JSON — try a different model or PDF.', raw: raw.slice(0, 500) })
+      return res.status(500).json({ error: 'AI returned invalid JSON. The statement may have too many transactions — try exporting a shorter date range (e.g. one month) or a different model.', raw: raw.slice(0, 500) })
     }
 
     // Accept both the new { account, transactions } object shape and the legacy
