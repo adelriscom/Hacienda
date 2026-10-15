@@ -10,7 +10,7 @@
  *   npx playwright test tests/recurring-screen.spec.js
  */
 import { test } from '@playwright/test'
-import { expect, openApp, profileSwitch, idsFor, MEMBERS } from './fixtures/hacienda-stub.js'
+import { expect, openApp, openDashboard, profileSwitch, idsFor } from './fixtures/hacienda-stub.js'
 
 const ALL_SERIES  = ['Salary', 'Mortgage', 'Rent', 'Celular', 'Internet', 'Gym']
 const ALEX_SERIES = ['Salary', 'Mortgage', 'Internet', 'Gym']
@@ -37,6 +37,9 @@ async function removeSeries(page, name) {
 
 const patchesIn = (writes) =>
   writes.filter(w => w.method === 'PATCH' && w.table === 'transactions')
+
+const statusOf = (page, name) => seriesRow(page, name).locator('.rec-status > div').first().innerText()
+const dueOf    = (page, name) => seriesRow(page, name).locator('.rec-status > div').nth(1).innerText()
 
 test.describe('Recurring screen · profile scoping', () => {
   test('family mode lists every member’s series', async ({ page }) => {
@@ -129,5 +132,73 @@ test.describe('Recurring screen · removing a series', () => {
 
     await expect(row.getByTitle('Remove from recurring')).toBeVisible()
     expect(patchesIn(writes)).toHaveLength(0)
+  })
+})
+
+test.describe('Recurring screen · payment status', () => {
+  test('status comes from money actually paid, not from the due date', async ({ page }) => {
+    await openRecurring(page, 'family')
+
+    // Unpaid and past due.
+    expect(await statusOf(page, 'Mortgage')).toBe('Overdue')
+    expect(await dueOf(page, 'Mortgage')).toBe('Due Oct 10')
+
+    // Due on the pinned date — distinct from overdue.
+    expect(await statusOf(page, 'Gym')).toBe('Due today')
+
+    // Settled through October, so the next thing owed is November. The defect
+    // reported this as overdue because it only compared dates.
+    expect(await statusOf(page, 'Internet')).toBe('Upcoming')
+    expect(await dueOf(page, 'Internet')).toBe('Due Nov 12')
+
+    // Close but not yet due.
+    expect(await statusOf(page, 'Celular')).toBe('In 6 days')
+  })
+
+  test('a partly paid obligation reports its balance and its lateness', async ({ page }) => {
+    await openRecurring(page, 'family')
+
+    expect(await statusOf(page, 'Rent')).toBe('Partially paid')
+    // Lateness rides on the due-date line so it can't crowd out the description.
+    expect(await dueOf(page, 'Rent')).toBe('Due Oct 8 · Overdue')
+    await expect(seriesRow(page, 'Rent').locator('.rec-status')).toContainText('$500.00 left')
+  })
+
+  test('recurring income is worded as income, not as a bill', async ({ page }) => {
+    await openRecurring(page, 'family')
+    // Salary is not yet due this cycle, so it shows its date rather than a verdict.
+    expect(await statusOf(page, 'Salary')).toBe('Upcoming')
+    expect(await dueOf(page, 'Salary')).toBe('Due Oct 30')
+  })
+})
+
+test.describe('One scheduling engine', () => {
+  test('the Recurring screen and the Dashboard agree on due dates', async ({ page }) => {
+    // Internet is the telling case: the old day-stepping engine put its next
+    // payment on Nov 11 (last payment + 30 days) while the Dashboard projected
+    // Nov 12 by calendar month. Both now read the same schedule.
+    await openRecurring(page, 'family')
+    expect(await dueOf(page, 'Internet')).toBe('Due Nov 12')
+    expect(await dueOf(page, 'Mortgage')).toBe('Due Oct 10')
+    expect(await dueOf(page, 'Celular')).toBe('Due Oct 20')
+
+    await openDashboard(page, 'family')
+    const nov = page.locator('.pay-card .pay-month')
+      .filter({ has: page.locator('.pay-period-title', { hasText: 'NOVEMBER 2026' }) })
+    await nov.locator('.pay-month-h').click()
+    await expect(nov.locator('.pay-row')
+      .filter({ has: page.locator('.up-name', { hasText: /^Internet$/ }) })
+      .locator('.up-sub')).toContainText('Due Nov 12, 2026')
+  })
+
+  test('a settled obligation is never reported as overdue on either surface', async ({ page }) => {
+    await openRecurring(page, 'family')
+    // Overdue can sit on either line of the cell, so read the whole cell.
+    const cells = await page.locator('.rec-status').allInnerTexts()
+    // Only Mortgage and Rent are genuinely outstanding and late.
+    expect(cells.filter(t => t.includes('Overdue'))).toHaveLength(2)
+
+    await openDashboard(page, 'family')
+    await expect(page.locator('.pay-card .insight-sub')).toContainText('2 overdue')
   })
 })

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
-import { detectFrequency, predictNext } from './useRecurring'
+import { groupRecurring } from './useRecurring'
+import {
+  toObligation, buildSchedule, currentOccurrences, statusLabel, isOutstanding, STATUS,
+} from '../lib/paymentSchedule'
 
 function nowMonth() {
   const d = new Date()
@@ -90,45 +93,50 @@ export function useNotifications() {
         })
       }
 
-      // 3. Recurring payments due within 3 days or overdue
-      const { data: recurringTxs } = await supabase
+      // 3. Recurring obligations that are still owed and due within 3 days.
+      //    Same grouping and same schedule the screens use, so the bell can't
+      //    disagree with the Dashboard about when a bill is due or whether it
+      //    has already been paid.
+      let recurringQuery = supabase
         .from('transactions')
-        .select('*, account:accounts(name)')
+        .select('*, account:accounts(name, currency)')
         .eq('is_recurring', true)
+        .neq('status', 'ghost').neq('status', 'duplicate')
         .order('occurred_at', { ascending: false })
+      if (!isFamily && myUserId) recurringQuery = recurringQuery.eq('user_id', myUserId)
+      const { data: recurringTxs } = await recurringQuery
 
       if (recurringTxs?.length) {
-        const groups = new Map()
-        recurringTxs.forEach(t => {
-          const key = t.description.toLowerCase().trim()
-          if (!groups.has(key)) groups.set(key, { ...t, _dates: [t.occurred_at] })
-          else groups.get(key)._dates.push(t.occurred_at)
-        })
+        const grouped = groupRecurring(recurringTxs)
+        const byKey   = new Map(grouped.map(g => [g._key, g]))
+        const current = currentOccurrences(buildSchedule(grouped.map(toObligation)))
 
-        const todayMidnight = new Date()
-        todayMidnight.setHours(0, 0, 0, 0)
+        for (const [key, occ] of current) {
+          // A settled obligation is not a notification, however close its due
+          // date is — this is what the old date-only check got wrong.
+          if (!isOutstanding(occ)) continue
+          if (occ.daysFromDue > 3) continue
 
-        for (const item of groups.values()) {
-          const freq     = detectFrequency(item._dates)
-          const nextDate = predictNext(item.occurred_at, freq.days)
-          nextDate.setHours(0, 0, 0, 0)
-          const daysUntil = Math.ceil((nextDate - todayMidnight) / 86400000)
+          const item   = byKey.get(key)
+          const d      = occ.daysFromDue
+          const amount = occ.status === STATUS.PARTIAL ? occ.remaining : occ.scheduled
+          const fmtAmt = '$' + Math.abs(amount).toLocaleString('en-CA', { minimumFractionDigits: 2 })
+          const when   = d < 0  ? `${Math.abs(d)}d overdue`
+                       : d === 0 ? 'due today'
+                       : d === 1 ? 'due tomorrow'
+                       : `due in ${d} days`
+          const label  = occ.status === STATUS.PARTIAL
+            ? `${statusLabel(occ.status, occ.obligation.isIncome)} · ${fmtAmt} left`
+            : fmtAmt
 
-          if (daysUntil <= 3) {
-            const fmtAmt = '$' + Math.abs(item.amount).toLocaleString('en-CA', { minimumFractionDigits: 2 })
-            const when   = daysUntil < 0  ? `${Math.abs(daysUntil)}d overdue`
-                         : daysUntil === 0 ? 'due today'
-                         : daysUntil === 1 ? 'due tomorrow'
-                         : `due in ${daysUntil} days`
-            notifications.push({
-              id:       `recurring-${item.id}`,
-              type:     'recurring',
-              title:    item.description,
-              body:     `${fmtAmt} · ${freq.label} · ${when}`,
-              path:     '/recurring',
-              severity: daysUntil < 0 ? 'neg' : 'warn',
-            })
-          }
+          notifications.push({
+            id:       `recurring-${occ.id}`,
+            type:     'recurring',
+            title:    item?.description || occ.obligation.description,
+            body:     `${label} · ${occ.obligation.freqLabel} · ${when}`,
+            path:     '/recurring',
+            severity: occ.isOverdue ? 'neg' : 'warn',
+          })
         }
       }
 

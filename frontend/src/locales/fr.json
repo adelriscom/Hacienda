@@ -146,7 +146,11 @@
     "overdue": "En retard",
     "inDays": "Dans {{n}} jours",
     "remove": "Retirer des récurrents",
-    "confirm": "Confirmer"
+    "confirm": "Confirmer",
+    "paid": "Payé", "partial": "Partiellement payé", "dueToday": "Échéance aujourd’hui",
+    "received": "Reçu", "notReceived": "Non reçu",
+    "upcoming": "À venir",
+    "due": "Échéance", "left": "restant"
   },
   "review": {
     "title": "À réviser",

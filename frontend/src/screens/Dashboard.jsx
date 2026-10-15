@@ -9,8 +9,7 @@ import { useExchangeRates } from '../hooks/useExchangeRates'
 import { useCategories } from '../hooks/useCategories'
 import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
 import {
-  STATUS, statusLabel, toObligation, buildSchedule, groupByPeriod, groupByOwner,
-  periodBounds, isOutstanding,
+  STATUS, statusLabel, groupByPeriod, groupByOwner, periodBounds, isOutstanding,
 } from '../lib/paymentSchedule'
 
 function nowMonth() {
@@ -76,7 +75,8 @@ export default function Dashboard() {
 
   // Payments are scoped to the selected profile: own user in a personal profile,
   // the whole household in Family (which is what RLS already permits).
-  const { items: recurringItems } = useRecurring({ userId: isFamily ? null : myUserId })
+  // The hook owns the projection, so every surface reads one schedule.
+  const { occurrences } = useRecurring({ userId: isFamily ? null : myUserId })
 
   // Obligations are a "today" view, independent of the month the stats above are
   // focused on, so cross-currency totals use the current month's rates.
@@ -95,10 +95,6 @@ export default function Dashboard() {
   // Ownership only needs spelling out when the household actually has more than one member.
   const showOwner = isFamily && (members?.length || 0) > 1
 
-  const occurrences = useMemo(
-    () => buildSchedule(recurringItems.map(toObligation), { today: new Date() }),
-    [recurringItems]
-  )
   // Grouping always runs over every occurrence, so month and member totals
   // describe the whole period. The Outstanding/All toggle only decides which
   // rows are listed — it never changes what a period says is owed.

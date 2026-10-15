@@ -6,6 +6,29 @@ import NewTransactionModal from '../components/NewTransactionModal'
 import { useRecurring } from '../hooks/useRecurring'
 import { useTransactions } from '../hooks/useTransactions'
 import { useHousehold } from '../lib/household'
+import { STATUS } from '../lib/paymentSchedule'
+
+// The occurrence carries two independent facts — how much has been paid, and
+// where the due date sits — so the row reports payment progress first and falls
+// back to the date only when nothing is owed yet.
+function statusOf(occ, isIncome, t) {
+  if (!occ) return { text: '—', tone: 'var(--ink-3)' }
+  const d = occ.daysFromDue
+  switch (occ.status) {
+    case STATUS.PAID:
+      return { text: isIncome ? t('recurring.received') : t('recurring.paid'), tone: 'var(--pos)' }
+    case STATUS.PARTIAL:
+      return { text: t('recurring.partial'), tone: 'var(--warn)' }
+    case STATUS.OVERDUE:
+      return { text: isIncome ? t('recurring.notReceived') : t('recurring.overdue'), tone: 'var(--neg)' }
+    case STATUS.DUE_TODAY:
+      return { text: t('recurring.dueToday'), tone: 'var(--neg)' }
+    default:
+      return d <= 7
+        ? { text: t('recurring.inDays', { n: d }), tone: 'var(--warn)' }
+        : { text: t('recurring.upcoming'), tone: 'var(--ink-3)' }
+  }
+}
 
 const fmt     = n => '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK    = n => Math.abs(n) >= 1000 ? `$${(Math.abs(n) / 1000).toFixed(1)}k` : fmt(n)
@@ -116,10 +139,10 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
   const color = item.category?.color || 'var(--accent)'
   const isIncome = item.amount > 0
 
-  const nextDate   = item._nextDate
-  const daysUntil  = Math.round((nextDate - new Date()) / (1000 * 60 * 60 * 24))
-  const isOverdue  = daysUntil < 0
-  const isSoon     = daysUntil >= 0 && daysUntil <= 7
+  const occ    = item._occurrence
+  const status = statusOf(occ, isIncome, t)
+  // A partly paid obligation past its due date is both things at once.
+  const alsoOverdue = occ?.status === STATUS.PARTIAL && occ.isOverdue
 
   return (
     <div className="rec-row" style={{
@@ -168,21 +191,21 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
         </div>
       </div>
 
-      {/* Next date */}
-      <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 90 }}>
-        <div style={{
-          fontSize: 11, fontWeight: 600,
-          color: isOverdue ? 'var(--neg)' : isSoon ? 'var(--warn)' : 'var(--ink-3)',
-        }}>
-          {isOverdue
-            ? t('recurring.overdue')
-            : isSoon
-              ? t('recurring.inDays', { n: daysUntil })
-              : fmtDate(nextDate)}
+      {/* Payment status, then the period it belongs to */}
+      <div className="rec-status" style={{ textAlign: 'right', flexShrink: 0, minWidth: 94 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: status.tone }}>
+          {status.text}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
-          {t('recurring.lastSeen')} {fmtDate(item.occurred_at)}
+        <div style={{ fontSize: 10, color: alsoOverdue ? 'var(--neg)' : 'var(--ink-3)', marginTop: 1 }}>
+          {occ
+            ? `${t('recurring.due')} ${fmtDate(occ.dueDate)}${alsoOverdue ? ` · ${t('recurring.overdue')}` : ''}`
+            : `${t('recurring.lastSeen')} ${fmtDate(item.occurred_at)}`}
         </div>
+        {occ?.status === STATUS.PARTIAL && (
+          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
+            {fmt(occ.remaining)} {t('recurring.left')}
+          </div>
+        )}
       </div>
 
       {/* Amount */}

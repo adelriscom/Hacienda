@@ -363,7 +363,7 @@
       <span><b>Read</b> 14 source files, 17 migrations</span>
       <span><b>Date</b> 15 October 2026</span>
       <span><b>Schema changes</b> none</span>
-      <span><b>Status</b> 2 of 6 defects fixed</span>
+      <span><b>Status</b> 4 of 6 defects fixed</span>
     </div>
   </div>
 </header>
@@ -386,20 +386,20 @@
         <span class="tile-l">Rule entities</span>
         <span class="tile-s">No table, no row, no identity. A series exists only as transactions sharing a description.</span>
       </div>
-      <div class="tile warn">
-        <span class="tile-n">3</span>
-        <span class="tile-l">Next-date engines</span>
-        <span class="tile-s">Recurring screen, notification bell and Dashboard each compute due dates differently.</span>
+      <div class="tile ok">
+        <span class="tile-n">1</span>
+        <span class="tile-l">Next-date engine</span>
+        <span class="tile-s">The Recurring screen, the notification bell and the Dashboard now read one schedule. Two <code>predictNext</code> copies are gone.</span>
       </div>
       <div class="tile ok">
         <span class="tile-n">1</span>
         <span class="tile-l">Record type</span>
         <span class="tile-s">Only a transaction row carries money, so obligations cannot be double-counted.</span>
       </div>
-      <div class="tile crit">
-        <span class="tile-n">4</span>
+      <div class="tile warn">
+        <span class="tile-n">2</span>
         <span class="tile-l">Defects still open</span>
-        <span class="tile-s">Of six found, the two that blocked day-to-day use are fixed; four consistency and structural gaps remain.</span>
+        <span class="tile-s">Of six found, four are fixed. The two that remain are limits of the model itself, not coding errors.</span>
       </div>
     </div>
   </section>
@@ -497,7 +497,7 @@
           </tr>
           <tr>
             <td class="q">Next payment date</td>
-            <td>Three implementations disagree — see defect 3. The Dashboard steps by calendar month; the other two add a fixed day count.</td>
+            <td>One implementation, in <code>paymentSchedule.js</code>, stepping by calendar month so day-of-month survives short months and year boundaries. Previously three — see defect 3.</td>
           </tr>
           <tr>
             <td class="q">Auto-generates expenses?</td>
@@ -505,11 +505,11 @@
           </tr>
           <tr>
             <td class="q">Paid / partial / outstanding</td>
-            <td>Only the Dashboard knows. It matches real transactions against projected occurrences. The Recurring screen has no concept of payment status at all.</td>
+            <td>Derived by matching real transactions against projected occurrences, and now reported the same way on the Dashboard, the Recurring screen and the notification bell.</td>
           </tr>
           <tr>
             <td class="q">Profile &amp; family</td>
-            <td>Via <code>transactions.user_id</code> plus a <code>person</code> label. RLS grants household-wide <code>SELECT</code> and own-only writes. The Recurring screen ignores the profile selector — see defect 2.</td>
+            <td>Via <code>transactions.user_id</code> plus a <code>person</code> label. RLS grants household-wide <code>SELECT</code> and own-only writes. Every surface now honours the profile selector.</td>
           </tr>
         </tbody>
       </table>
@@ -543,7 +543,7 @@
     <div class="sec-head">
       <span class="eyebrow">Findings</span>
       <h2>Defects, ranked by impact</h2>
-      <p>Ranking is the structure here: 1 and 2 affected daily use and are now fixed; 3 and 4 make modules disagree; 5 and 6 are limits of the model itself.</p>
+      <p>Ranking is the structure here: 1 and 2 affected daily use, 3 and 4 made modules disagree — all four are now fixed. 5 and 6 are limits of the model itself and need the obligations rethink below.</p>
     </div>
     <div class="stack">
 
@@ -573,38 +573,39 @@
           It called <code>useRecurring()</code> with no argument, so <code>userId</code> stayed null
           and the query returned the whole household — in Personal mode you saw the other member's
           obligations. It now scopes the same way Transactions, Expenses, Calendar and the Dashboard
-          already do. <b>The notification bell still does not</b> — see defect 4.
+          already do — as does the notification bell, fixed alongside defect 3.
         </p>
         <p class="defect-where">frontend/src/screens/Recurring.jsx</p>
       </div>
 
-      <div class="defect med">
+      <div class="defect fixed">
         <span class="rank">3</span>
         <div class="defect-head">
           <h3>Three different next-date calculations</h3>
-          <span class="chip warn">Medium</span>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          The Recurring screen uses <code>predictNext()</code> — last date plus N days. The
-          notification bell carries its own copy of that logic. The Dashboard steps by calendar
-          month. Day-stepping drifts: a bill due 31 January lands on 2 March instead of 28 February,
-          and the drift compounds every cycle. The three surfaces can show three different due dates
-          for the same bill.
+          The Recurring screen used <code>predictNext()</code> — last date plus N days — and the
+          notification bell carried its own copy, while the Dashboard stepped by calendar month.
+          Day-stepping drifts: a bill due 31 January landed on 2 March instead of 28 February, and
+          the drift compounded every cycle. <code>useRecurring</code> now owns the projection and
+          hands the same schedule to every surface; both <code>predictNext</code> copies are deleted.
         </p>
         <p class="defect-where">useRecurring.js · useNotifications.js · lib/paymentSchedule.js</p>
       </div>
 
-      <div class="defect med">
+      <div class="defect fixed">
         <span class="rank">4</span>
         <div class="defect-head">
-          <h3>“Overdue” on the Recurring screen ignores payment status</h3>
-          <span class="chip warn">Medium</span>
+          <h3>“Overdue” on the Recurring screen ignored payment status</h3>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          The badge is computed purely from the predicted date, with no reference to whether money
-          moved. A bill paid on time can read as Overdue there while the Dashboard correctly reads it
-          as Paid. The notification bell shares the flaw and additionally merges members, so one
-          household alert can describe two people's bills as one.
+          The badge was computed purely from the predicted date, with no reference to whether money
+          moved, so a bill paid on time read as Overdue while the Dashboard correctly read it as
+          Paid. The bell shared the flaw, merged members, and ignored the profile selector. Both now
+          report the real occurrence — Paid, Partially paid, Overdue, Due today or Upcoming — and
+          the bell stays silent on anything already settled.
         </p>
         <p class="defect-where">frontend/src/screens/Recurring.jsx · frontend/src/hooks/useNotifications.js</p>
       </div>
@@ -701,15 +702,23 @@
           </tr>
           <tr>
             <td class="q mono">hooks/useRecurring.js</td>
-            <td><code>removeRecurring()</code> takes the grouped item and unflags every transaction in the series (defect 1).</td>
+            <td><code>removeRecurring()</code> takes the grouped item and unflags every transaction in the series (defect 1). The hook now also owns the projection and exposes the schedule, so no consumer rebuilds it (defect 3).</td>
           </tr>
           <tr>
             <td class="q mono">screens/Recurring.jsx</td>
-            <td>Scoped to the selected profile (defect 2), plus <code>rec-row</code> and <code>rec-name</code> hooks so a series can be targeted without leaning on DOM shape.</td>
+            <td>Scoped to the selected profile (defect 2); each row reports the real occurrence's payment status instead of a date guess (defect 4), plus <code>rec-row</code> / <code>rec-name</code> hooks so a series can be targeted without leaning on DOM shape.</td>
+          </tr>
+          <tr>
+            <td class="q mono">hooks/useNotifications.js</td>
+            <td>Builds the same series and reads the same schedule as the screens, scopes to the selected profile, and stays silent on settled obligations (defects 3 and 4).</td>
+          </tr>
+          <tr>
+            <td class="q mono">locales/</td>
+            <td>Status wording for the Recurring screen in all three languages.</td>
           </tr>
           <tr>
             <td class="q mono">tests/</td>
-            <td>31 unit tests over the derivation, 21 Playwright tests over the UI. The Supabase stub moved to <code>tests/fixtures/</code> and now records writes, so the removal tests can assert exactly which ids were sent. All pass.</td>
+            <td>38 unit tests over the derivation, 26 Playwright tests over the UI. The Supabase stub moved to <code>tests/fixtures/</code> and now records writes, so the removal tests can assert exactly which ids were sent. All pass.</td>
           </tr>
         </tbody>
       </table>
@@ -739,11 +748,11 @@
         </p>
       </div>
       <div class="rec">
-        <h4>One scheduling engine</h4>
+        <h4>One scheduling engine <span class="chip ok">Done</span></h4>
         <p>
-          Point the Recurring screen and the notification bell at <code>paymentSchedule.js</code> and
-          delete the two <code>predictNext</code> copies. This closes defects 3 and 4 together and
-          gives the three surfaces one source of truth.
+          <code>useRecurring</code> builds the schedule once and exposes it, so the Recurring screen,
+          the notification bell and the Dashboard all read the same projection. Both
+          <code>predictNext</code> copies are deleted. This closed defects 3 and 4 together.
         </p>
       </div>
       <div class="rec">
@@ -784,7 +793,7 @@
       <h2>Outstanding issues</h2>
     </div>
     <ul class="tight prose">
-      <li>Defects 1 and 2 are fixed and covered by tests that fail on the old code. Defects 3 through 6 are reported, not fixed — the brief asked for findings before any business-logic change, and those four change how scheduling works.</li>
+      <li>Defects 1 through 4 are fixed and covered by tests. Defects 5 and 6 remain: they are consequences of inferring obligations from transactions, and closing them means adopting real obligation records rather than patching the derivation.</li>
       <li>16 Playwright tests across <code>status-badge</code>, <code>transfer-pairs</code> and the <code>verify-*</code> specs fail. Four need a <code>PW_PASSWORD</code> that is blank in <code>.env.test</code>; the rest rely on stale fixtures. Confirmed identical on a clean baseline, so none are caused by this work.</li>
       <li>Member subtotals describe the whole period while the Outstanding filter hides settled rows. Intended, and the toggle sits directly above — but it is the one place a reader may need a second look.</li>
     </ul>
