@@ -9,7 +9,7 @@ import { useExchangeRates } from '../hooks/useExchangeRates'
 import { useCategories } from '../hooks/useCategories'
 import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
 import {
-  STATUS, statusLabel, toObligation, buildSchedule, groupByPeriod,
+  STATUS, statusLabel, toObligation, buildSchedule, groupByPeriod, groupByOwner,
   periodBounds, isOutstanding,
 } from '../lib/paymentSchedule'
 
@@ -64,6 +64,11 @@ export default function Dashboard() {
   const [stats, setStats]           = useState(null)
   const [loading, setLoading]       = useState(true)
   const [showPaid, setShowPaid]     = useState(false)
+  // Accordions track only what the user has *toggled*, so defaults stay
+  // declarative: the current month opens, other months stay closed, and every
+  // member section inside an open month starts expanded.
+  const [flippedMonths,  setFlippedMonths]  = useState(() => new Set())
+  const [closedMembers,  setClosedMembers]  = useState(() => new Set())
   const { isFamily, myUserId, household, members, myName } = useHousehold()
   const { categories: allCategories } = useCategories()
   const didAutoJump = useRef(false)
@@ -94,28 +99,39 @@ export default function Dashboard() {
     () => buildSchedule(recurringItems.map(toObligation), { today: new Date() }),
     [recurringItems]
   )
-  const visibleOccurrences = useMemo(
-    () => (showPaid ? occurrences : occurrences.filter(isOutstanding)),
+  // Grouping always runs over every occurrence, so month and member totals
+  // describe the whole period. The Outstanding/All toggle only decides which
+  // rows are listed — it never changes what a period says is owed.
+  const allPeriods = useMemo(
+    () => groupByPeriod(occurrences, convertToBase),
+    [occurrences, convertToBase]
+  )
+  const visibleIds = useMemo(
+    () => new Set((showPaid ? occurrences : occurrences.filter(isOutstanding)).map(o => o.id)),
     [occurrences, showPaid]
   )
   const periods = useMemo(
-    () => groupByPeriod(visibleOccurrences, convertToBase),
-    [visibleOccurrences, convertToBase]
+    () => allPeriods.filter(p => p.occurrences.some(o => visibleIds.has(o.id))),
+    [allPeriods, visibleIds]
   )
-  // Period totals always describe the whole period, not just the rows on screen.
-  const periodTotals = useMemo(() => {
-    const map = {}
-    groupByPeriod(occurrences, convertToBase).forEach(p => { map[p.ym] = p })
-    return map
-  }, [occurrences, convertToBase])
 
   const overdueCount  = occurrences.filter(o => o.isOverdue).length
   // The headline balance is what this month still owes — the per-period rows
   // below carry the rest, so it can't read as "all of this is due now".
-  const thisPeriod    = periodTotals[currentMonth]
+  const thisPeriod    = allPeriods.find(p => p.ym === currentMonth)
   const profileLabel  = isFamily
     ? `Family${household?.name ? ` · ${household.name}` : ''}`
     : (myName || 'My profile')
+
+  const isMonthOpen  = ym  => (ym === currentMonth) !== flippedMonths.has(ym)
+  const isMemberOpen = key => !closedMembers.has(key)
+  const toggleIn = (setter) => (key) => setter(prev => {
+    const next = new Set(prev)
+    next.has(key) ? next.delete(key) : next.add(key)
+    return next
+  })
+  const toggleMonth  = toggleIn(setFlippedMonths)
+  const toggleMember = toggleIn(setClosedMembers)
 
   useEffect(() => {
     async function load() {
@@ -270,8 +286,11 @@ export default function Dashboard() {
       {periods.length === 0 ? (
         <div className="pay-empty">Every payment in this window is settled.</div>
       ) : periods.map(p => (
-        <PeriodSection key={p.ym} period={p} totals={periodTotals[p.ym]}
-          showOwner={showOwner} memberName={memberName} fmt={fmt}
+        <MonthAccordion key={p.ym} period={p} visibleIds={visibleIds}
+          open={isMonthOpen(p.ym)} onToggle={() => toggleMonth(p.ym)}
+          showOwner={showOwner} memberName={memberName}
+          convert={convertToBase} fmt={fmt}
+          isMemberOpen={isMemberOpen} onToggleMember={toggleMember}
           onOpen={() => navigate('/recurring')} />
       ))}
     </div>
@@ -429,47 +448,131 @@ export default function Dashboard() {
   )
 }
 
-// One payment period: the month an obligation belongs to, its exact span, and
-// its totals. Totals describe the whole period even when paid rows are hidden.
-function PeriodSection({ period, totals, showOwner, memberName, fmt, onOpen }) {
-  const { first, last } = periodBounds(period.ym)
-  const t = totals || period
+// Keyboard-activated accordion header, matching the Categories screen's
+// click-the-row-to-toggle convention.
+function accordionProps(open, onToggle) {
+  return {
+    role: 'button', tabIndex: 0, 'aria-expanded': open,
+    onClick: onToggle,
+    onKeyDown: e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() }
+    },
+  }
+}
+
+function Chevron({ open }) {
+  return <span className={`pay-chev ${open ? 'open' : ''}`} aria-hidden="true">▾</span>
+}
+
+function Tot({ label, value, color }) {
   return (
-    <div className="pay-period">
-      <div className="pay-period-h">
-        <div className="pay-period-id">
-          <div className="pay-period-title">{fmtMonthLong(period.ym)}</div>
-          <div className="pay-period-span">
-            Payment period · {fmtDay(first)} – {fmtDay(last)}
-          </div>
-        </div>
-        <div className="pay-period-tot">
-          <div><span className="pay-tot-label">Scheduled</span>
-            <span className="num">{fmt(t.scheduledBase)}</span></div>
-          <div><span className="pay-tot-label">Outstanding</span>
-            <span className="num" style={{ color: t.outstandingBase > 0 ? 'var(--neg)' : 'var(--pos)' }}>
-              {fmt(t.outstandingBase)}
-            </span></div>
-          {t.inflowBase > 0 && (
-            <div><span className="pay-tot-label">Expected in</span>
-              <span className="num" style={{ color: 'var(--pos)' }}>{fmt(t.inflowBase)}</span></div>
-          )}
-        </div>
-      </div>
-      <div className="upcoming-list">
-        {period.occurrences.map(o => (
-          <PaymentRow key={o.id} occ={o} showOwner={showOwner}
-            memberName={memberName} onOpen={onOpen} />
-        ))}
-      </div>
+    <div className="pay-tot">
+      <span className="pay-tot-label">{label}</span>
+      <span className="num" style={color ? { color } : undefined}>{value}</span>
     </div>
   )
 }
 
-function PaymentRow({ occ, showOwner, memberName, onOpen }) {
+// Level 1 — the payment period. Totals describe the whole period even when paid
+// rows are hidden, so collapsing or filtering never changes what is owed.
+function MonthAccordion({
+  period: t, visibleIds, open, onToggle, showOwner, memberName, convert, fmt,
+  isMemberOpen, onToggleMember, onOpen,
+}) {
+  const { first, last } = periodBounds(t.ym)
+  const n = t.occurrences.length
+  const visible = t.occurrences.filter(o => visibleIds.has(o.id))
+
+  // Level 2 — one section per member, ordered by display name. Subtotals come
+  // from every occurrence the member owns, matching the month header.
+  const members = showOwner
+    ? groupByOwner(t.occurrences, convert)
+        .map(g => ({ ...g, name: memberName[g.ownerUserId] || g.person || 'Unassigned' }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    : null
+
+  return (
+    <div className="pay-month">
+      <div className="pay-month-h" {...accordionProps(open, onToggle)}>
+        <Chevron open={open} />
+        <div className="pay-month-id">
+          <div className="pay-period-title">{fmtMonthLong(t.ym)}</div>
+          <div className="pay-period-span">
+            Payment period · {fmtDay(first)} – {fmtDay(last)} · {n} payment{n === 1 ? '' : 's'}
+            {t.overdueCount > 0 && (
+              <> · <strong style={{ color: 'var(--neg)' }}>{t.overdueCount} overdue</strong></>
+            )}
+          </div>
+        </div>
+        <div className="pay-period-tot">
+          <Tot label="Scheduled" value={fmt(t.scheduledBase)} />
+          <Tot label="Paid" value={fmt(t.paidBase)} color="var(--pos)" />
+          <Tot label="Outstanding" value={fmt(t.outstandingBase)}
+            color={t.outstandingBase > 0 ? 'var(--neg)' : 'var(--pos)'} />
+          {t.inflowBase > 0 && <Tot label="Expected in" value={fmt(t.inflowBase)} color="var(--pos)" />}
+        </div>
+      </div>
+
+      {open && (
+        <div className="pay-month-body">
+          {members
+            ? members.map(g => (
+                <MemberAccordion key={g.key} group={g} fmt={fmt}
+                  rows={g.occurrences.filter(o => visibleIds.has(o.id))}
+                  open={isMemberOpen(`${t.ym}|${g.key}`)}
+                  onToggle={() => onToggleMember(`${t.ym}|${g.key}`)}
+                  onOpen={onOpen} />
+              ))
+            : (
+              <div className="upcoming-list">
+                {visible.map(o => <PaymentRow key={o.id} occ={o} onOpen={onOpen} />)}
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Level 2 — one family member's obligations inside a period.
+function MemberAccordion({ group, rows, open, onToggle, fmt, onOpen }) {
+  const n = group.occurrences.length
+  return (
+    <div className="pay-member">
+      <div className="pay-member-h" {...accordionProps(open, onToggle)}>
+        <Chevron open={open} />
+        <span className="pay-avatar">{group.name.slice(0, 2).toUpperCase()}</span>
+        <div className="pay-member-id">
+          <div className="pay-member-name">{group.name}</div>
+          <div className="pay-member-meta">
+            {n} payment{n === 1 ? '' : 's'}
+            {group.overdueCount > 0 && (
+              <> · <strong style={{ color: 'var(--neg)' }}>{group.overdueCount} overdue</strong></>
+            )}
+          </div>
+        </div>
+        <div className="pay-member-tot">
+          <Tot label="Obligations" value={fmt(group.scheduledBase)} />
+          <Tot label="Paid" value={fmt(group.paidBase)} color="var(--pos)" />
+          <Tot label="Remaining" value={fmt(group.outstandingBase)}
+            color={group.outstandingBase > 0 ? 'var(--neg)' : 'var(--pos)'} />
+        </div>
+      </div>
+      {open && (
+        <div className="upcoming-list pay-member-body">
+          {rows.length > 0
+            ? rows.map(o => <PaymentRow key={o.id} occ={o} onOpen={onOpen} />)
+            : <div className="pay-empty">Everything settled this period.</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Ownership is carried by the enclosing member accordion, so rows don't repeat it.
+function PaymentRow({ occ, onOpen }) {
   const ob    = occ.obligation
   const tone  = STATUS_TONE[occ.status] || STATUS_TONE[STATUS.UPCOMING]
-  const owner = memberName[ob.ownerUserId] || ob.person || null
   const label = statusLabel(occ.status, ob.isIncome)
   const pct   = Math.round(occ.progress * 100)
   const d     = occ.daysFromDue
@@ -499,7 +602,6 @@ function PaymentRow({ occ, showOwner, memberName, onOpen }) {
               Overdue
             </span>
           )}
-          {showOwner && owner && <span className="pay-owner">{owner}</span>}
         </div>
         <div className="up-sub">
           Due {fmtFullDay(occ.dueDate)}{timing}

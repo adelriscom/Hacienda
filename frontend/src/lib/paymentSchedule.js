@@ -253,32 +253,54 @@ export function paidInBase(occurrence, convert) {
   ), 0)
 }
 
+function emptyGroup(extra) {
+  return {
+    ...extra, occurrences: [],
+    scheduledBase: 0, paidBase: 0, outstandingBase: 0, inflowBase: 0,
+    counts: { paid: 0, partial: 0, overdue: 0, due_today: 0, upcoming: 0 },
+    overdueCount: 0,
+  }
+}
+
+// Income is kept out of the obligation totals: a salary isn't money owed.
+function accumulate(g, o, convert) {
+  const cur = o.obligation.currency
+  g.occurrences.push(o)
+  g.counts[o.status] = (g.counts[o.status] || 0) + 1
+  if (o.isOverdue) g.overdueCount++
+  if (o.obligation.isIncome) {
+    g.inflowBase += convert(o.scheduled, cur)
+  } else {
+    g.scheduledBase   += convert(o.scheduled, cur)
+    g.paidBase        += paidInBase(o, convert)
+    g.outstandingBase += convert(o.remaining, cur)
+  }
+}
+
 // Groups occurrences into payment periods. Totals run through
 // `convert(amount, currency)` — the app's base-currency conversion — so amounts
 // in different currencies are never summed raw.
 export function groupByPeriod(occurrences, convert = a => a) {
   const map = new Map()
   occurrences.forEach(o => {
-    if (!map.has(o.periodYm)) map.set(o.periodYm, {
-      ym: o.periodYm, occurrences: [],
-      scheduledBase: 0, paidBase: 0, outstandingBase: 0, inflowBase: 0,
-      counts: { paid: 0, partial: 0, overdue: 0, due_today: 0, upcoming: 0 },
-      overdueCount: 0,
-    })
-    const g   = map.get(o.periodYm)
-    const cur = o.obligation.currency
-    g.occurrences.push(o)
-    g.counts[o.status] = (g.counts[o.status] || 0) + 1
-    if (o.isOverdue) g.overdueCount++
-    if (o.obligation.isIncome) {
-      g.inflowBase += convert(o.scheduled, cur)
-    } else {
-      g.scheduledBase   += convert(o.scheduled, cur)
-      g.paidBase        += paidInBase(o, convert)
-      g.outstandingBase += convert(o.remaining, cur)
-    }
+    if (!map.has(o.periodYm)) map.set(o.periodYm, emptyGroup({ ym: o.periodYm }))
+    accumulate(map.get(o.periodYm), o, convert)
   })
   return [...map.values()].sort((a, b) => a.ym.localeCompare(b.ym))
+}
+
+// Groups occurrences by who owns the obligation, with the same totals as a
+// period group. Ownership follows the transaction's user_id, so a shared bill
+// belongs to the one member who pays it and is counted once.
+export function groupByOwner(occurrences, convert = a => a) {
+  const map = new Map()
+  occurrences.forEach(o => {
+    const { ownerUserId, person } = o.obligation
+    const key = ownerUserId || person || ''
+    if (!map.has(key)) map.set(key, emptyGroup({ key, ownerUserId, person }))
+    accumulate(map.get(key), o, convert)
+  })
+  return [...map.values()]
 }
 
 export const isOutstanding = o => o.status !== STATUS.PAID
