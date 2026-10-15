@@ -1,0 +1,584 @@
+<title>Declared Obligations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #eef1f2;
+    --surface:    #ffffff;
+    --surface-2:  #f5f7f8;
+    --ink-0:      #101a1e;
+    --ink-1:      #3b4a51;
+    --ink-2:      #6a7c84;
+    --line:       #d8e0e3;
+    --line-soft:  #e7edef;
+    --accent:     #0d5f63;
+    --accent-ink: #0d5f63;
+    --accent-bg:  #e0eded;
+    --ok:         #1c7449;
+    --ok-bg:      #dfeee6;
+    --warn:       #8d5c00;
+    --warn-bg:    #f6ebd6;
+    --crit:       #a3322a;
+    --crit-bg:    #f6e1df;
+    --shadow:     0 1px 2px rgba(16, 26, 30, .05), 0 8px 24px -16px rgba(16, 26, 30, .25);
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono:    "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0c1214;
+      --surface:    #141d20;
+      --surface-2:  #1a2428;
+      --ink-0:      #e9eff1;
+      --ink-1:      #b2c1c6;
+      --ink-2:      #7d9097;
+      --line:       #243236;
+      --line-soft:  #1d292d;
+      --accent:     #58b6ba;
+      --accent-ink: #7fcbce;
+      --accent-bg:  #11292b;
+      --ok:         #5cc392;
+      --ok-bg:      #122b21;
+      --warn:       #dba63f;
+      --warn-bg:    #2c2314;
+      --crit:       #e8796d;
+      --crit-bg:    #2e1a19;
+      --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0c1214;
+    --surface:    #141d20;
+    --surface-2:  #1a2428;
+    --ink-0:      #e9eff1;
+    --ink-1:      #b2c1c6;
+    --ink-2:      #7d9097;
+    --line:       #243236;
+    --line-soft:  #1d292d;
+    --accent:     #58b6ba;
+    --accent-ink: #7fcbce;
+    --accent-bg:  #11292b;
+    --ok:         #5cc392;
+    --ok-bg:      #122b21;
+    --warn:       #dba63f;
+    --warn-bg:    #2c2314;
+    --crit:       #e8796d;
+    --crit-bg:    #2e1a19;
+    --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink-1);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px 96px; }
+  .prose { max-width: 680px; }
+
+  h1, h2, h3, h4 { font-family: var(--display); color: var(--ink-0); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.08; letter-spacing: -.022em; font-weight: 700; }
+  h2 { font-size: clamp(22px, 3vw, 27px); line-height: 1.18; letter-spacing: -.014em; font-weight: 600; }
+  h3 { font-size: 17.5px; line-height: 1.3; letter-spacing: -.005em; font-weight: 600; }
+  h4 { font-size: 14px; line-height: 1.35; font-weight: 600; }
+  p  { margin: 0; }
+
+  code, .mono { font-family: var(--mono); font-size: .855em; }
+  code {
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: .08em .34em;
+    color: var(--ink-0);
+    word-break: break-word;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+
+  header { border-bottom: 1px solid var(--line); background: var(--surface); margin-bottom: 48px; }
+  .header-inner {
+    max-width: 1060px; margin: 0 auto; padding: 56px 24px 40px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .lede { font-size: 19px; color: var(--ink-1); max-width: 680px; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 22px;
+    font-family: var(--display); font-size: 12.5px; color: var(--ink-2);
+    padding-top: 6px; border-top: 1px solid var(--line-soft);
+  }
+  .meta b { color: var(--ink-1); font-weight: 600; }
+
+  section { margin-bottom: 56px; }
+  .sec-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+  .sec-head p { color: var(--ink-2); font-size: 16px; max-width: 700px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  .table-wrap {
+    overflow-x: auto; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; }
+  th, td {
+    text-align: left; padding: 10px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top; font-size: 15px;
+  }
+  th {
+    font-family: var(--display); font-size: 11px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-2); background: var(--surface-2); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.col { font-family: var(--mono); font-size: 13px; color: var(--ink-0); white-space: nowrap; }
+  td.verdict { white-space: nowrap; }
+
+  .chip {
+    display: inline-block; font-family: var(--display);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  }
+  .chip.ok   { background: var(--ok-bg);     color: var(--ok); }
+  .chip.warn { background: var(--warn-bg);   color: var(--warn); }
+  .chip.crit { background: var(--crit-bg);   color: var(--crit); }
+  .chip.info { background: var(--accent-bg); color: var(--accent-ink); }
+
+  /* Phases are a real sequence — each one is unsafe to start before the last */
+  .phase {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 22px; display: grid;
+    grid-template-columns: 34px 1fr; gap: 6px 16px; box-shadow: var(--shadow);
+  }
+  .phase-n {
+    font-family: var(--display); font-size: 15px; font-weight: 700;
+    color: var(--accent-ink); grid-row: span 3;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-bg); display: grid; place-items: center;
+  }
+  .phase-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .phase-body { font-size: 15px; }
+  .phase ul { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; }
+  .phase-files { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+
+  .note {
+    background: var(--accent-bg);
+    border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+    border-radius: 10px; padding: 16px 20px; font-size: 15.5px; color: var(--ink-1);
+  }
+  .note b { font-family: var(--display); font-weight: 600; color: var(--ink-0); }
+  .note.risk {
+    background: var(--crit-bg);
+    border-color: color-mix(in oklab, var(--crit) 35%, transparent);
+  }
+
+  .decisions { display: flex; flex-direction: column; gap: 12px; }
+  .decision {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--warn); border-radius: 8px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 7px;
+    box-shadow: var(--shadow);
+  }
+  .decision-q { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink-0); }
+  .decision p { font-size: 14.5px; }
+  .rec-line {
+    font-size: 14.5px; padding-top: 7px; border-top: 1px solid var(--line-soft);
+  }
+  .rec-line b { font-family: var(--display); font-size: 13px; color: var(--accent-ink); letter-spacing: .04em; text-transform: uppercase; }
+
+  .seam {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 20px;
+  }
+  .node {
+    font-family: var(--display); font-size: 12.5px; font-weight: 600;
+    padding: 6px 11px; border-radius: 6px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--ink-1); white-space: nowrap;
+  }
+  .node.new  { background: var(--ok-bg);     border-color: var(--ok);     color: var(--ok); }
+  .node.hub  { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-ink); }
+  .arrow { color: var(--ink-2); font-family: var(--mono); font-size: 13px; }
+
+  .checks { display: flex; flex-direction: column; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .check { background: var(--surface); padding: 12px 18px; display: flex; gap: 13px; align-items: flex-start; }
+  .check-mark { color: var(--ok); font-family: var(--mono); font-weight: 600; font-size: 14px; padding-top: 2px; }
+  .check-txt { font-size: 15px; }
+  .check-txt b { font-family: var(--display); font-size: 14.5px; font-weight: 600; color: var(--ink-0); }
+
+  footer {
+    border-top: 1px solid var(--line); padding-top: 20px;
+    font-size: 13.5px; color: var(--ink-2); font-family: var(--display);
+  }
+  a { color: var(--accent-ink); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .header-inner { padding: 36px 20px 28px; }
+    .wrap { padding: 0 20px 64px; }
+    .phase { grid-template-columns: 1fr; gap: 8px; }
+    .phase-n { grid-row: auto; }
+  }
+</style>
+
+<header>
+  <div class="header-inner">
+    <span class="eyebrow">Hacienda · Scope</span>
+    <h1>Declared Obligations</h1>
+    <p class="lede">
+      Defects 5 and 6 are the last two open from the recurring-payments audit, and neither is a
+      coding error — both follow from inferring obligations out of transactions. This scopes the
+      change that dissolves them: giving an obligation a row of its own.
+    </p>
+    <div class="meta">
+      <span><b>Closes</b> Defects 5 and 6</span>
+      <span><b>New tables</b> none — <code>scheduled_payments</code> already exists</span>
+      <span><b>Migration</b> 018</span>
+      <span><b>Date</b> 15 October 2026</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Why these two are different</span>
+      <h2>One root cause, not two bugs</h2>
+    </div>
+    <div class="stack prose">
+      <p>
+        <b>Defect 5</b> — an obligation is invisible until its first payment. You cannot schedule a
+        bill you have never paid, and a cancelled subscription keeps projecting forward until someone
+        unflags it.
+      </p>
+      <p>
+        <b>Defect 6</b> — the description <i>is</i> the series identity. Renaming one transaction
+        silently splits a series in two; naming two unrelated bills alike silently merges them.
+      </p>
+      <p>
+        Both exist because a series is a <code>GROUP BY</code> over transactions rather than a thing.
+        Patching the grouping cannot fix either: a smarter key still can't represent a bill with no
+        payments, and a series with no id can't survive a rename. They dissolve together the moment
+        an obligation has a row and a primary key.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">The good news</span>
+      <h2><code>toObligation</code> is the seam</h2>
+      <p>
+        Everything downstream of it — projection, settlement, status, period and member grouping, the
+        accordion — operates on the obligation shape and has no idea where that shape came from.
+      </p>
+    </div>
+    <div class="stack">
+      <div class="seam">
+        <span class="node">Flagged transactions</span>
+        <span class="arrow">→</span>
+        <span class="node">inferred series</span>
+        <span class="arrow">↘</span>
+        <span class="node hub">toObligation()</span>
+        <span class="arrow">→</span>
+        <span class="node">buildSchedule</span>
+        <span class="arrow">→</span>
+        <span class="node">settle</span>
+        <span class="arrow">→</span>
+        <span class="node">status</span>
+        <span class="arrow">→</span>
+        <span class="node">UI</span>
+      </div>
+      <div class="seam">
+        <span class="node new">scheduled_payments row</span>
+        <span class="arrow">→</span>
+        <span class="node new">linked transactions</span>
+        <span class="arrow">↗</span>
+        <span class="node hub">same seam</span>
+        <span class="arrow">→</span>
+        <span class="node">unchanged from here on</span>
+      </div>
+      <div class="note">
+        <b>The Dashboard does not change.</b> Adopting declared obligations means adding a second
+        producer of the obligation shape, not rewriting the pipeline. That is the payoff from
+        collapsing the three scheduling engines into one — the work is now concentrated at one
+        function and the screens that create rules, rather than spread across every surface.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">What already exists</span>
+      <h2><code>scheduled_payments</code>, column by column</h2>
+      <p>
+        Defined in <code>001_schema.sql</code>, never touched since, and read by no frontend code.
+        Most of it is exactly right; three things need work.
+      </p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Column</th><th>Verdict</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="col">id</td><td class="verdict"><span class="chip ok">Keep</span></td><td>The stable identity defect 6 needs. Surviving a rename is the whole point.</td></tr>
+          <tr><td class="col">name</td><td class="verdict"><span class="chip ok">Keep</span></td><td>Replaces description-as-identity. Free to rename.</td></tr>
+          <tr><td class="col">amount</td><td class="verdict"><span class="chip ok">Keep</span></td><td>The declared expected amount. Retires the median-of-recent-payments heuristic.</td></tr>
+          <tr><td class="col">is_active</td><td class="verdict"><span class="chip ok">Keep</span></td><td>The pause/resume switch the audit found missing. Also ends the cancelled-subscription half of defect 5.</td></tr>
+          <tr><td class="col">user_id</td><td class="verdict"><span class="chip ok">Keep</span></td><td>Ownership, matching how transactions already work.</td></tr>
+          <tr><td class="col">account_id<br>category_id<br>type</td><td class="verdict"><span class="chip ok">Keep</span></td><td>Currency comes from the account, exactly as it does for transactions today.</td></tr>
+          <tr><td class="col">frequency</td><td class="verdict"><span class="chip warn">Widen</span></td><td>CHECK allows <code>once / weekly / biweekly / monthly / yearly</code>. <code>detectFrequency</code> also produces semi-monthly and quarterly, which would be silently coerced to monthly.</td></tr>
+          <tr><td class="col">next_date</td><td class="verdict"><span class="chip crit">Wrong model</span></td><td>A mutable cursor. Advancing it as payments land re-entangles period with status — the exact thing the Dashboard work separated. Projection needs a fixed <code>anchor_date</code> instead.</td></tr>
+          <tr><td class="col">auto_debit</td><td class="verdict"><span class="chip info">Unused</span></td><td>Harmless. Leave it.</td></tr>
+          <tr><td class="col">RLS</td><td class="verdict"><span class="chip crit">Own-only</span></td><td><code>using (auth.uid() = user_id)</code> — a household member cannot see another's obligations, so Family mode would show nothing. Needs the hardened pattern from migration 017.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack" style="margin-top: 16px;">
+      <div class="note">
+        <b>Missing entirely:</b> <code>anchor_date</code> (first due date, fixed), <code>ends_on</code>
+        (so a cancelled series stops projecting without losing its history),
+        <code>person</code> (parity with <code>transactions.person</code> for the Shared label), and
+        the link itself — <code>transactions.obligation_id</code>.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Plan</span>
+      <h2>Five phases</h2>
+      <p>
+        Numbered because the order is load-bearing: each phase is unsafe to start before the one
+        before it has landed and been verified against real data.
+      </p>
+    </div>
+    <div class="stack">
+
+      <div class="phase">
+        <span class="phase-n">1</span>
+        <div class="phase-head"><h3>Schema</h3><span class="chip ok">Small</span></div>
+        <div class="phase-body">
+          One migration, reversible, no data written.
+          <ul>
+            <li>Widen the <code>frequency</code> CHECK to cover semi-monthly and quarterly.</li>
+            <li>Add <code>anchor_date</code>, <code>ends_on</code>, <code>person</code>; drop <code>NOT NULL</code> from <code>next_date</code> and stop treating it as truth.</li>
+            <li>Replace own-only RLS with household <code>SELECT</code> / own-only writes, following migration 017's hardened form.</li>
+            <li>Add <code>transactions.obligation_id</code> with <code>ON DELETE SET NULL</code> — deleting a rule must never delete financial history — plus an index.</li>
+          </ul>
+          <div class="phase-files">supabase/migrations/018_*.sql · supabase/migrations/down/018_*.down.sql</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">2</span>
+        <div class="phase-head"><h3>Backfill</h3><span class="chip crit">Riskiest</span></div>
+        <div class="phase-body">
+          Turn every inferred series into a real row, then link its transactions. This is the only
+          step that writes to real financial data.
+          <ul>
+            <li>Reuse the tested <code>detectFrequency</code> from the app rather than reimplementing median-gap detection in SQL — a second detector would repeat the mistake defect 3 just fixed.</li>
+            <li>Dry-run mode first: print every rule it would create and every transaction it would link, and change nothing.</li>
+            <li>Idempotent, so a partial run can be repeated safely.</li>
+            <li>Run <code>scripts/db/backup-local.sh</code> immediately before the real pass.</li>
+          </ul>
+          <div class="phase-files">scripts/db/backfill-obligations.mjs</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">3</span>
+        <div class="phase-head"><h3>Derivation</h3><span class="chip warn">Medium</span></div>
+        <div class="phase-body">
+          A second producer of the obligation shape, so declared rules flow through the pipeline that
+          already exists.
+          <ul>
+            <li><code>obligationFromRule(rule, linkedTransactions)</code> alongside <code>toObligation</code>.</li>
+            <li>Settlement matches on <code>obligation_id</code> when present, falling back to nearest-due-date for anything still unlinked.</li>
+            <li>Expected amount comes from <code>rule.amount</code>; the median stays only as the fallback for inferred series.</li>
+            <li><code>is_active = false</code> and <code>ends_on</code> stop projection without hiding history.</li>
+          </ul>
+          <div class="phase-files">frontend/src/lib/paymentSchedule.js · frontend/src/hooks/useRecurring.js</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">4</span>
+        <div class="phase-head"><h3>Rule management</h3><span class="chip crit">Largest</span></div>
+        <div class="phase-body">
+          The user-facing half, and the only phase that changes what people do.
+          <ul>
+            <li>The Recurring screen becomes an obligation manager: create, edit, pause, resume, delete <i>rules</i>. Today it creates transactions.</li>
+            <li>A bill can finally be scheduled before it is ever paid — defect 5, closed.</li>
+            <li><code>NewTransactionModal</code>'s <code>is_recurring</code> checkbox becomes an obligation picker: "counts toward &lt;obligation&gt;".</li>
+            <li>Dashboard, notifications and Expenses need no changes.</li>
+          </ul>
+          <div class="phase-files">frontend/src/screens/Recurring.jsx · frontend/src/components/NewTransactionModal.jsx · locales/</div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <span class="phase-n">5</span>
+        <div class="phase-head"><h3>Convergence</h3><span class="chip info">Gated on 4</span></div>
+        <div class="phase-body">
+          Retire the old path once nothing depends on it.
+          <ul>
+            <li>Drop description-based grouping and the median fallback.</li>
+            <li>Decide <code>is_recurring</code>'s fate — see the decisions below.</li>
+            <li>Defect 6 closes here: with grouping gone, a rename is just a rename.</li>
+          </ul>
+          <div class="phase-files">frontend/src/hooks/useRecurring.js · frontend/src/hooks/useTransactions.js</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Needs your call</span>
+      <h2>Five decisions I should not make alone</h2>
+      <p>Each changes what gets built. My recommendation is on each, but these are judgement calls about your money and your data.</p>
+    </div>
+    <div class="decisions">
+
+      <div class="decision">
+        <span class="decision-q">1 · How far back should the backfill reach?</span>
+        <p>
+          Every series that has ever existed, or only those seen in the last N months? Backfilling
+          everything resurrects cancelled subscriptions as active obligations projecting into the
+          future — which is the cancelled half of defect 5, reintroduced by the fix for it.
+        </p>
+        <p class="rec-line"><b>Recommend</b> &nbsp;Backfill all of it for history, but set <code>is_active = false</code> on any series with no payment in the last two cycles. Nothing is lost, and nothing phantom projects.</p>
+      </div>
+
+      <div class="decision">
+        <span class="decision-q">2 · Does an obligation belong to a person or to the household?</span>
+        <p>
+          Today a shared bill is one transaction stream owned by whoever pays it, tagged
+          <code>Shared</code>. Family subtotals attribute it wholly to the payer. A household-owned
+          obligation would model it properly — and is a materially bigger change.
+        </p>
+        <p class="rec-line"><b>Recommend</b> &nbsp;Keep <code>user_id</code> ownership for now and carry <code>person</code> across for the label. Treat shared-cost splitting as its own piece of work rather than smuggling it in here.</p>
+      </div>
+
+      <div class="decision">
+        <span class="decision-q">3 · What happens to <code>is_recurring</code>?</span>
+        <p>
+          It becomes derivable from <code>obligation_id IS NOT NULL</code>. Dropping it means
+          touching six call sites including the transaction tag and the import paths; keeping it
+          means a denormalised flag that can drift from the link.
+        </p>
+        <p class="rec-line"><b>Recommend</b> &nbsp;Keep it through phase 4, drop it in phase 5. Dropping it mid-migration multiplies the risk of the one phase that writes real data.</p>
+      </div>
+
+      <div class="decision">
+        <span class="decision-q">4 · How should genuinely variable bills behave?</span>
+        <p>
+          Hydro is never the same twice. A declared amount makes it read as Partially paid whenever
+          it lands more than 2% low, and Paid-with-change when it lands high. The median heuristic
+          handled this accidentally well.
+        </p>
+        <p class="rec-line"><b>Recommend</b> &nbsp;An <code>is_variable</code> flag on the rule: the declared amount becomes an estimate, and settlement treats any payment in the cycle as settling it in full.</p>
+      </div>
+
+      <div class="decision">
+        <span class="decision-q">5 · Do one-off obligations belong in this pass?</span>
+        <p>
+          The <code>frequency</code> enum already allows <code>once</code>, but the projection assumes
+          repetition throughout. Supporting it means a special case in occurrence generation.
+        </p>
+        <p class="rec-line"><b>Recommend</b> &nbsp;Defer. Reject <code>once</code> at the UI for now and keep the projection uniform. A one-off bill is adequately served by a plain transaction.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Risk</span>
+      <h2>Where this can go wrong</h2>
+    </div>
+    <div class="stack">
+      <div class="note risk">
+        <b>Phase 2 is the one to be careful with.</b> It writes to 600-plus real transactions in a
+        live financial record. Everything else is additive or reversible. Mitigations: dry-run that
+        prints and changes nothing, a backup immediately before, idempotent writes, and a down
+        migration that drops the link column without touching a single transaction's money.
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>Backfill mis-detects a frequency and creates a wrong schedule</td><td>Dry-run output reviewed before the real pass; frequency is editable afterwards, and correcting a rule does not touch any transaction.</td></tr>
+            <tr><td>Two sources of obligations coexist during phases 2–4</td><td>Settlement prefers the link and falls back to inference, so both paths produce the same shape. Phase 5 removes the fallback once nothing needs it.</td></tr>
+            <tr><td>Semi-monthly or quarterly series silently coerced to monthly</td><td>Widen the CHECK in phase 1, before any row is written.</td></tr>
+            <tr><td>Deleting a rule takes transactions with it</td><td><code>ON DELETE SET NULL</code>, asserted by a test before the backfill runs.</td></tr>
+            <tr><td>Family mode shows nothing because RLS is own-only</td><td>Phase 1 replaces the policy; a Playwright test against the two-member fixture household catches a regression.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Unchanged</span>
+      <h2>What this does not touch</h2>
+    </div>
+    <div class="checks">
+      <div class="check"><span class="check-mark">✓</span><span class="check-txt"><b>The Dashboard.</b> Upcoming Payments, the accordion, totals and statuses all consume the obligation shape and never learn where it came from.</span></div>
+      <div class="check"><span class="check-mark">✓</span><span class="check-txt"><b>Financial totals.</b> A transaction stays the only record that carries money. Obligations remain a projection and never enter Income or Expenses.</span></div>
+      <div class="check"><span class="check-mark">✓</span><span class="check-txt"><b>Currency handling.</b> <code>toBase()</code> and <code>buildRateMap()</code> are untouched.</span></div>
+      <div class="check"><span class="check-mark">✓</span><span class="check-txt"><b>History.</b> No transaction is edited, moved or deleted — the backfill only sets a link column.</span></div>
+      <div class="check"><span class="check-mark">✓</span><span class="check-txt"><b>Expenses, Reports, Budgets, Calendar.</b> No changes at all.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">If you only do part of it</span>
+      <h2>Where to stop</h2>
+    </div>
+    <div class="stack prose">
+      <p>
+        Phases 1 to 3 are worth doing on their own: they add the records, the link and the
+        derivation without changing a single screen. At that point a declared obligation works
+        end-to-end — it just has no UI to create one, so the only rules that exist are the ones the
+        backfill made.
+      </p>
+      <p>
+        Phase 4 is where the user-visible value lands, and it is the largest piece. Phase 5 is
+        cleanup; leaving it undone costs a redundant code path, not correctness.
+      </p>
+      <p>
+        <b>Stopping after phase 3 is a coherent place to be.</b> Stopping mid-phase-2 is not —
+        that leaves half the series linked and half inferred.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Hacienda · Scope for defects 5 and 6 · Companion to the Recurring Payments audit · Read from source at commit <span class="mono">3e1c520</span>
+  </footer>
+
+</div>

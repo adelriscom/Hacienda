@@ -26,9 +26,18 @@ Exit code is the number of failures, so it drops straight into CI.
 | `run.sh` | The runner. Creates the cluster, applies, tests, tears down. |
 | `harness.sql` | The Supabase-provided pieces a plain cluster lacks — the `auth` schema, a stub `auth.uid()` driven by the `test.uid` setting, the `authenticated` role, and the two user ids migration 007 seeds against. |
 | `<nnn>_*.test.sql` | One suite per migration worth testing. |
+| `backfill-fixture.sql` | Realistic recurring transactions — fixed, variable, cancelled, weekly, income, two owners sharing a description, plus a ghost and a non-recurring row that must be left alone. |
 
 Seed migrations (`*seed*.sql`) are skipped — they insert demo data rather than
 define schema.
+
+If Node is available the runner also integration-tests
+`scripts/db/backfill-obligations.mjs` against that fixture: that the dry run
+writes nothing, that applying creates the expected rules and links, that **no
+transaction's money, date, description or category changes**, that owners never
+cross, that ghost rows stay unlinked, and that re-running is a no-op. It is the
+only tooling that writes to real financial data, so it gets tested rather than
+carefully read.
 
 ## Writing a suite
 

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
-import { groupRecurring } from './useRecurring'
 import {
-  toObligation, buildSchedule, currentOccurrences, statusLabel, isOutstanding, STATUS,
+  groupRecurring, toObligation, buildSchedule, currentOccurrences,
+  statusLabel, isOutstanding, STATUS,
 } from '../lib/paymentSchedule'
 
 function nowMonth() {

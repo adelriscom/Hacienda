@@ -100,6 +100,64 @@ for t in "$HERE"/*.test.sql; do
   done
 done
 
+# ── Backfill script ─────────────────────────────────────────────────────────
+# The one piece of tooling that writes to real financial data, so it gets an
+# integration test rather than a careful read.
+BACKFILL="$HERE/../../scripts/db/backfill-obligations.mjs"
+if [ -f "$BACKFILL" ] && command -v node >/dev/null 2>&1; then
+  echo "▸ backfill script"
+  psql_run -c "create database backfill_test" >/dev/null 2>&1
+  bf() { psql_run -q -d backfill_test "$@"; }
+  bf -f "$HERE/harness.sql" >/dev/null 2>&1
+  for f in "$MIGRATIONS"/*.sql; do
+    case "$(basename "$f")" in *seed*) continue ;; esac
+    bf -f "$f" >/dev/null 2>&1
+  done
+  bf -f "$HERE/backfill-fixture.sql" >/dev/null 2>&1
+
+  export SUPABASE_DB_URL="postgresql://postgres@127.0.0.1:$PORT/backfill_test"
+  FP="select md5(string_agg(id::text||'|'||amount||'|'||occurred_at||'|'||description||'|'||coalesce(category_id::text,'-')||'|'||type||'|'||status, ',' order by id)) from transactions"
+  before=$(psql_run -tAq -d backfill_test -c "$FP")
+
+  if node "$BACKFILL" >/dev/null 2>&1; then
+    created_by_dryrun=$(psql_run -tAq -d backfill_test -c "select count(*) from scheduled_payments")
+    if [ "$created_by_dryrun" = "0" ]; then
+      echo "  ok   dry run writes nothing"
+    else
+      echo "  FAIL dry run created $created_by_dryrun rows"; fails=$((fails + 1))
+    fi
+  else
+    echo "  FAIL dry run errored"; fails=$((fails + 1))
+  fi
+
+  if node "$BACKFILL" --apply >/dev/null 2>&1; then
+    rules=$(psql_run -tAq -d backfill_test -c "select count(*) from scheduled_payments")
+    links=$(psql_run -tAq -d backfill_test -c "select count(*) from transactions where obligation_id is not null")
+    [ "$rules" = "8" ] && echo "  ok   created 8 obligations" || { echo "  FAIL created $rules obligations, expected 8"; fails=$((fails + 1)); }
+    [ "$links" = "20" ] && echo "  ok   linked 20 transactions" || { echo "  FAIL linked $links transactions, expected 20"; fails=$((fails + 1)); }
+  else
+    echo "  FAIL apply errored"; fails=$((fails + 1))
+  fi
+
+  after=$(psql_run -tAq -d backfill_test -c "$FP")
+  if [ "$before" = "$after" ]; then
+    echo "  ok   no transaction's money, date, description or category changed"
+  else
+    echo "  FAIL the backfill modified a transaction"; fails=$((fails + 1))
+  fi
+
+  # Owners must never cross, and the ghost must stay unlinked.
+  crossed=$(psql_run -tAq -d backfill_test -c "select count(*) from transactions t join scheduled_payments s on s.id=t.obligation_id where s.user_id <> t.user_id")
+  [ "$crossed" = "0" ] && echo "  ok   no transaction linked across owners" || { echo "  FAIL $crossed linked across owners"; fails=$((fails + 1)); }
+  ghost=$(psql_run -tAq -d backfill_test -c "select count(*) from transactions where status='ghost' and obligation_id is not null")
+  [ "$ghost" = "0" ] && echo "  ok   ghost rows left unlinked" || { echo "  FAIL a ghost row was linked"; fails=$((fails + 1)); }
+
+  node "$BACKFILL" --apply >/dev/null 2>&1
+  again=$(psql_run -tAq -d backfill_test -c "select count(*) from scheduled_payments")
+  [ "$again" = "8" ] && echo "  ok   re-running creates nothing" || { echo "  FAIL re-run brought the total to $again"; fails=$((fails + 1)); }
+  unset SUPABASE_DB_URL
+fi
+
 if [ "$fails" -eq 0 ]; then
   echo "▸ all clean"
 else
