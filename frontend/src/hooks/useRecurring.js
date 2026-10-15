@@ -29,23 +29,37 @@ export function predictNext(lastDateStr, frequencyDays) {
   return d
 }
 
-export function useRecurring() {
+// `userId` scopes the result to one profile's own recurring transactions; pass
+// null (the default) for the whole household, which is what RLS already allows.
+export function useRecurring({ userId = null } = {}) {
   const [items,   setItems]   = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('transactions')
-      .select('*, account:accounts(name), category:categories(name, color)')
+      .select('*, account:accounts(name, currency), category:categories(name, color)')
       .eq('is_recurring', true)
+      // Ghost and duplicate rows aren't real money, so they can't settle an
+      // obligation or inflate its history.
+      .neq('status', 'ghost').neq('status', 'duplicate')
       .order('occurred_at', { ascending: false })
+    if (userId) query = query.eq('user_id', userId)
+    const { data } = await query
 
+    // Keyed by owner as well as description: two household members paying their
+    // own "Internet" are two obligations, not one merged row.
     const groups = new Map()
     ;(data || []).forEach(t => {
-      const key = t.description.toLowerCase().trim()
-      if (!groups.has(key)) groups.set(key, { ...t, _dates: [t.occurred_at] })
-      else groups.get(key)._dates.push(t.occurred_at)
+      const key = `${t.user_id || ''}|${t.description.toLowerCase().trim()}`
+      if (!groups.has(key))
+        groups.set(key, { ...t, _key: key, _dates: [t.occurred_at], _txns: [t] })
+      else {
+        const g = groups.get(key)
+        g._dates.push(t.occurred_at)
+        g._txns.push(t)
+      }
     })
 
     const result = [...groups.values()].map(item => {
@@ -65,7 +79,7 @@ export function useRecurring() {
 
     setItems(result)
     setLoading(false)
-  }, [])
+  }, [userId])
 
   useEffect(() => { load() }, [load])
 

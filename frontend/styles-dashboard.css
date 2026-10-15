@@ -289,6 +289,100 @@
 .ok-chip { background: var(--pos-soft); color: var(--pos); }
 .warn-chip { background: var(--warn-soft); color: var(--warn); }
 
+/* ── Upcoming payments: periods, status, partial progress ── */
+.pay-card .insight-h { align-items: flex-start; }
+.pay-toggle { display: flex; gap: 4px; flex-shrink: 0; }
+.pay-empty {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.pay-period + .pay-period { margin-top: 18px; }
+.pay-period-h {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0 2px 7px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.pay-period-id { min-width: 0; }
+.pay-period-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-0);
+}
+.pay-period-span { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.pay-period-tot {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+}
+.pay-period-tot .num { font-weight: 700; color: var(--ink-0); }
+.pay-tot-label {
+  color: var(--ink-3);
+  margin-right: 5px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.pay-row { align-items: flex-start; cursor: pointer; }
+.pay-row:hover { border-color: var(--ink-4); }
+.pay-date { display: grid; place-items: center; align-content: center; }
+.pay-date-day { font-size: 13px; font-weight: 700; line-height: 1; }
+.pay-date-mon { font-size: 10px; line-height: 1.3; }
+
+.pay-main { flex: 1; min-width: 0; }
+.pay-main-h {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.pay-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.pay-owner {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-3);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.pay-progress { margin-top: 5px; max-width: 320px; }
+.pay-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.pay-progress-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+.pay-progress-txt { font-size: 10.5px; color: var(--ink-3); margin-top: 3px; }
+
+.pay-amt-col { flex-shrink: 0; text-align: right; }
+.pay-amt-sub {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 1px;
+  letter-spacing: 0.04em;
+}
+
 /* ── Mobile dashboard ── */
 @media (max-width: 768px) {
   /* Hero card: stack vertically, compact */
@@ -310,4 +404,13 @@
 
   /* Donut: smaller */
   .donut-wrap svg { width: 130px !important; height: 130px !important; }
+
+  /* Upcoming payments: let the header, period totals and rows wrap */
+  .pay-card .insight-h { flex-wrap: wrap; }
+  .pay-toggle { width: 100%; }
+  .pay-toggle .btn { flex: 1; }
+  .pay-period-h { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .pay-period-tot { gap: 10px 14px; }
+  .pay-row { gap: 10px; padding: 10px; }
+  .pay-progress { max-width: none; }
 }

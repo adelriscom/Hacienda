@@ -1,12 +1,17 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import { useRecurring } from '../hooks/useRecurring'
+import { useExchangeRates } from '../hooks/useExchangeRates'
 import { useCategories } from '../hooks/useCategories'
 import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
+import {
+  STATUS, statusLabel, toObligation, buildSchedule, groupByPeriod,
+  periodBounds, isOutstanding,
+} from '../lib/paymentSchedule'
 
 function nowMonth() {
   const d = new Date()
@@ -29,15 +34,88 @@ function fmtMonthShort(ym) {
   return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-CA', { month: 'short' })
 }
 
+function fmtDay(d) {
+  return d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
+}
+
+function fmtFullDay(d) {
+  return d.toLocaleDateString('en-CA', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// Amounts shown in the obligation's own currency — never converted for display,
+// only for the cross-currency totals (see convertToBase below).
+function fmtAmt(n, currency) {
+  const abs = Math.abs(Number(n) || 0)
+  return currency === 'COP'
+    ? '$' + Math.round(abs).toLocaleString('es-CO')
+    : '$' + abs.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const STATUS_TONE = {
+  [STATUS.PAID]:      { bg: 'var(--pos-soft)',  fg: 'var(--pos)' },
+  [STATUS.PARTIAL]:   { bg: 'var(--warn-soft)', fg: 'var(--warn)' },
+  [STATUS.OVERDUE]:   { bg: 'var(--neg-soft)',  fg: 'var(--neg)' },
+  [STATUS.DUE_TODAY]: { bg: 'var(--neg-soft)',  fg: 'var(--neg)' },
+  [STATUS.UPCOMING]:  { bg: 'var(--bg-3)',      fg: 'var(--ink-1)' },
+}
+
 export default function Dashboard() {
   const [focusMonth, setFocusMonth] = useState(nowMonth)
   const [stats, setStats]           = useState(null)
   const [loading, setLoading]       = useState(true)
-  const { isFamily, myUserId }      = useHousehold()
+  const [showPaid, setShowPaid]     = useState(false)
+  const { isFamily, myUserId, household, members, myName } = useHousehold()
   const { categories: allCategories } = useCategories()
   const didAutoJump = useRef(false)
   const navigate    = useNavigate()
-  const { items: recurringItems }   = useRecurring()
+
+  // Payments are scoped to the selected profile: own user in a personal profile,
+  // the whole household in Family (which is what RLS already permits).
+  const { items: recurringItems } = useRecurring({ userId: isFamily ? null : myUserId })
+
+  // Obligations are a "today" view, independent of the month the stats above are
+  // focused on, so cross-currency totals use the current month's rates.
+  const currentMonth = useMemo(nowMonth, [])
+  const { rates: liveRates } = useExchangeRates(currentMonth)
+  const convertToBase = useMemo(
+    () => (amount, currency) => toBase(amount, currency, liveRates),
+    [liveRates]
+  )
+
+  const memberName = useMemo(() => {
+    const map = {}
+    ;(members || []).forEach(m => { map[m.user_id] = m.display_name })
+    return map
+  }, [members])
+  // Ownership only needs spelling out when the household actually has more than one member.
+  const showOwner = isFamily && (members?.length || 0) > 1
+
+  const occurrences = useMemo(
+    () => buildSchedule(recurringItems.map(toObligation), { today: new Date() }),
+    [recurringItems]
+  )
+  const visibleOccurrences = useMemo(
+    () => (showPaid ? occurrences : occurrences.filter(isOutstanding)),
+    [occurrences, showPaid]
+  )
+  const periods = useMemo(
+    () => groupByPeriod(visibleOccurrences, convertToBase),
+    [visibleOccurrences, convertToBase]
+  )
+  // Period totals always describe the whole period, not just the rows on screen.
+  const periodTotals = useMemo(() => {
+    const map = {}
+    groupByPeriod(occurrences, convertToBase).forEach(p => { map[p.ym] = p })
+    return map
+  }, [occurrences, convertToBase])
+
+  const overdueCount  = occurrences.filter(o => o.isOverdue).length
+  // The headline balance is what this month still owes — the per-period rows
+  // below carry the rest, so it can't read as "all of this is due now".
+  const thisPeriod    = periodTotals[currentMonth]
+  const profileLabel  = isFamily
+    ? `Family${household?.name ? ` · ${household.name}` : ''}`
+    : (myName || 'My profile')
 
   useEffect(() => {
     async function load() {
@@ -163,14 +241,41 @@ export default function Dashboard() {
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)
   const todayLabel = new Date().toLocaleDateString('en-CA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0)
-  const upcoming = recurringItems
-    .map(item => {
-      const next = new Date(item._nextDate); next.setHours(0, 0, 0, 0)
-      return { ...item, _daysUntil: Math.ceil((next - todayMidnight) / 86400000) }
-    })
-    .filter(item => item._daysUntil <= 30)
-    .sort((a, b) => a._daysUntil - b._daysUntil)
+  const paymentsCard = occurrences.length > 0 && (
+    <div className="card insight pay-card">
+      <div className="insight-h">
+        <div className="insight-icon" style={{ background: 'rgba(99,102,241,.14)', color: 'var(--accent)' }}>
+          <Icon name="recurring" size={16} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="insight-title">Upcoming Payments</div>
+          <div className="insight-sub">
+            {profileLabel}
+            {overdueCount > 0 && (
+              <> · <strong style={{ color: 'var(--neg)' }}>{overdueCount} overdue</strong></>
+            )}
+            {thisPeriod && (
+              <> · {fmt(thisPeriod.outstandingBase)} outstanding in {fmtMonthLong(currentMonth)}</>
+            )}
+          </div>
+        </div>
+        <div className="pay-toggle">
+          <button className={`btn sm ${showPaid ? 'ghost' : 'primary'}`}
+            onClick={() => setShowPaid(false)}>Outstanding</button>
+          <button className={`btn sm ${showPaid ? 'primary' : 'ghost'}`}
+            onClick={() => setShowPaid(true)}>All</button>
+        </div>
+      </div>
+
+      {periods.length === 0 ? (
+        <div className="pay-empty">Every payment in this window is settled.</div>
+      ) : periods.map(p => (
+        <PeriodSection key={p.ym} period={p} totals={periodTotals[p.ym]}
+          showOwner={showOwner} memberName={memberName} fmt={fmt}
+          onOpen={() => navigate('/recurring')} />
+      ))}
+    </div>
+  )
 
   const nav = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -191,12 +296,15 @@ export default function Dashboard() {
     </>
   )
 
+  // Obligations don't depend on the focused month, so they stay visible even when
+  // that month has no transactions to summarise.
   if (!stats?.income && !stats?.expenses) return (
     <>
       <Topbar greet="Dashboard" date={todayLabel}>{nav}</Topbar>
       <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>
         No data for {fmtMonthLong(focusMonth)}.
       </div>
+      {paymentsCard}
     </>
   )
 
@@ -316,61 +424,112 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {upcoming.length > 0 && (
-        <div className="card insight">
-          <div className="insight-h">
-            <div className="insight-icon" style={{ background: 'rgba(99,102,241,.14)', color: 'var(--accent)' }}>
-              <Icon name="recurring" size={16} />
-            </div>
-            <div>
-              <div className="insight-title">Upcoming Payments</div>
-              <div className="insight-sub">
-                {upcoming.length} recurring {upcoming.length === 1 ? 'payment' : 'payments'} in the next 30 days
-              </div>
-            </div>
-          </div>
-          <div className="upcoming-list">
-            {upcoming.map(item => {
-              const { _daysUntil: d } = item
-              const isOverdue = d < 0
-              const isSoon    = d >= 0 && d <= 7
-              const chipBg    = isOverdue ? 'var(--neg-soft)'  : isSoon ? 'var(--warn-soft)' : 'var(--bg-3)'
-              const chipColor = isOverdue ? 'var(--neg)'       : isSoon ? 'var(--warn)'      : 'var(--ink-1)'
-              const next      = new Date(item._nextDate)
-              const dayNum    = next.getDate()
-              const mon       = next.toLocaleDateString('en-CA', { month: 'short' })
-              const dateLabel = isOverdue  ? `${Math.abs(d)}d ago`
-                              : d === 0   ? 'Today'
-                              : d === 1   ? 'Tmrw'
-                              : `${dayNum} ${mon}`
-              return (
-                <div key={item.id} className="up-row"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate('/recurring')}>
-                  <div className="up-date" style={{ background: chipBg, color: chipColor }}>
-                    {(isOverdue || d <= 1) ? (
-                      <div style={{ fontSize: 10, lineHeight: 1.3, textAlign: 'center' }}>{dateLabel}</div>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>{dayNum}</div>
-                        <div style={{ fontSize: 10, lineHeight: 1.3 }}>{mon}</div>
-                      </>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="up-name">{item.description}</div>
-                    <div className="up-sub">{item._freq.label}{item.account?.name ? ` · ${item.account.name}` : ''}</div>
-                  </div>
-                  <div className="up-amt" style={{ color: item.amount < 0 ? 'var(--neg)' : 'var(--pos)' }}>
-                    {item.amount < 0 ? '−' : '+'}${Math.abs(item.amount).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
-              )
-            })}
+      {paymentsCard}
+    </>
+  )
+}
+
+// One payment period: the month an obligation belongs to, its exact span, and
+// its totals. Totals describe the whole period even when paid rows are hidden.
+function PeriodSection({ period, totals, showOwner, memberName, fmt, onOpen }) {
+  const { first, last } = periodBounds(period.ym)
+  const t = totals || period
+  return (
+    <div className="pay-period">
+      <div className="pay-period-h">
+        <div className="pay-period-id">
+          <div className="pay-period-title">{fmtMonthLong(period.ym)}</div>
+          <div className="pay-period-span">
+            Payment period · {fmtDay(first)} – {fmtDay(last)}
           </div>
         </div>
-      )}
-    </>
+        <div className="pay-period-tot">
+          <div><span className="pay-tot-label">Scheduled</span>
+            <span className="num">{fmt(t.scheduledBase)}</span></div>
+          <div><span className="pay-tot-label">Outstanding</span>
+            <span className="num" style={{ color: t.outstandingBase > 0 ? 'var(--neg)' : 'var(--pos)' }}>
+              {fmt(t.outstandingBase)}
+            </span></div>
+          {t.inflowBase > 0 && (
+            <div><span className="pay-tot-label">Expected in</span>
+              <span className="num" style={{ color: 'var(--pos)' }}>{fmt(t.inflowBase)}</span></div>
+          )}
+        </div>
+      </div>
+      <div className="upcoming-list">
+        {period.occurrences.map(o => (
+          <PaymentRow key={o.id} occ={o} showOwner={showOwner}
+            memberName={memberName} onOpen={onOpen} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PaymentRow({ occ, showOwner, memberName, onOpen }) {
+  const ob    = occ.obligation
+  const tone  = STATUS_TONE[occ.status] || STATUS_TONE[STATUS.UPCOMING]
+  const owner = memberName[ob.ownerUserId] || ob.person || null
+  const label = statusLabel(occ.status, ob.isIncome)
+  const pct   = Math.round(occ.progress * 100)
+  const d     = occ.daysFromDue
+  const timing = occ.status === STATUS.PAID ? ''
+               : d === 0 ? ' · today'
+               : d < 0   ? ` · ${Math.abs(d)}d late`
+               : ` · in ${d}d`
+
+  return (
+    <div className="up-row pay-row" role="button" tabIndex={0}
+      title={`${ob.description} · due ${fmtFullDay(occ.dueDate)} · ${label}`}
+      onClick={onOpen} onKeyDown={e => e.key === 'Enter' && onOpen()}>
+      <div className="up-date pay-date" style={{ background: tone.bg, color: tone.fg }}>
+        <div className="pay-date-day">{occ.dueDate.getDate()}</div>
+        <div className="pay-date-mon">
+          {occ.dueDate.toLocaleDateString('en-CA', { month: 'short' })}
+        </div>
+      </div>
+
+      <div className="pay-main">
+        <div className="pay-main-h">
+          <span className="up-name">{ob.description}</span>
+          <span className="pay-chip" style={{ background: tone.bg, color: tone.fg }}>{label}</span>
+          {/* A partially paid obligation past its due date is both. */}
+          {occ.isOverdue && occ.status === STATUS.PARTIAL && (
+            <span className="pay-chip" style={{ background: 'var(--neg-soft)', color: 'var(--neg)' }}>
+              Overdue
+            </span>
+          )}
+          {showOwner && owner && <span className="pay-owner">{owner}</span>}
+        </div>
+        <div className="up-sub">
+          Due {fmtFullDay(occ.dueDate)}{timing}
+          {` · ${ob.freqLabel}`}
+          {ob.accountName ? ` · ${ob.accountName}` : ''}
+          {/* Actual payment date, kept distinct from the due date. */}
+          {occ.lastPaymentDate ? ` · paid ${fmtDay(occ.lastPaymentDate)}` : ''}
+        </div>
+        {occ.status === STATUS.PARTIAL && (
+          <div className="pay-progress">
+            <div className="pay-progress-bar">
+              <div className="pay-progress-fill" style={{ width: `${pct}%`, background: tone.fg }} />
+            </div>
+            <div className="pay-progress-txt">
+              {pct}% · {fmtAmt(occ.paid, ob.currency)} of {fmtAmt(occ.scheduled, ob.currency)} ·{' '}
+              <strong style={{ color: 'var(--neg)' }}>{fmtAmt(occ.remaining, ob.currency)} left</strong>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="pay-amt-col">
+        <div className="up-amt" style={{ color: ob.isIncome ? 'var(--pos)' : 'var(--neg)' }}>
+          {ob.isIncome ? '+' : '−'}{fmtAmt(occ.scheduled, ob.currency)}
+        </div>
+        {ob.currency && ob.currency !== BASE_CURRENCY && (
+          <div className="pay-amt-sub">{ob.currency}</div>
+        )}
+      </div>
+    </div>
   )
 }
 
