@@ -399,7 +399,12 @@ export default function Transactions({ type }) {
         />
       )}
       {showNew && (
-        <NewTransactionModal onClose={() => setShowNew(false)} onSave={addTransaction} onSavePair={addTransactions} />
+        <NewTransactionModal
+          onClose={() => setShowNew(false)}
+          onSave={addTransaction}
+          onSavePair={addTransactions}
+          defaults={{ type: ['income', 'expense', 'transfer'].includes(activeFilter) ? activeFilter : 'expense' }}
+        />
       )}
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} onSave={addTransactions} />

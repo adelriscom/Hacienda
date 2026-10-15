@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import { useRecurring } from '../hooks/useRecurring'
 import { useExchangeRates } from '../hooks/useExchangeRates'
-import { toBase, BASE_CURRENCY } from '../lib/currency'
+import { useCategories } from '../hooks/useCategories'
+import { toBase, BASE_CURRENCY, buildRateMap } from '../lib/currency'
 import {
   STATUS, statusLabel, toObligation, buildSchedule, groupByPeriod,
   periodBounds, isOutstanding,
@@ -64,6 +65,7 @@ export default function Dashboard() {
   const [loading, setLoading]       = useState(true)
   const [showPaid, setShowPaid]     = useState(false)
   const { isFamily, myUserId, household, members, myName } = useHousehold()
+  const { categories: allCategories } = useCategories()
   const didAutoJump = useRef(false)
   const navigate    = useNavigate()
 
@@ -141,7 +143,6 @@ export default function Dashboard() {
         buildQuery(true),
         supabase.from('exchange_rates')
           .select('currency_code, rate_to_base, month')
-          .lte('month', `${focusMonth}-01`)
           .order('month', { ascending: true }),
       ])
       // If exchange_rate column not in schema cache yet, fall back without it
@@ -150,9 +151,8 @@ export default function Dashboard() {
         txResult = await buildQuery(false)
       }
       const txs = txResult.data
-      // Effective rate per currency: latest saved rate on or before focusMonth
-      const rateMap = {}
-      ;(rateRows || []).forEach(r => { rateMap[r.currency_code] = Number(r.rate_to_base) })
+      // Effective rate per currency: nearest saved rate (carry forward, else earliest)
+      const rateMap = buildRateMap(rateRows || [], `${focusMonth}-01`)
       const toCAD = t => {
         const cur = t.account?.currency
         if (!cur || cur === BASE_CURRENCY) return t.amount
@@ -196,10 +196,20 @@ export default function Dashboard() {
       const prevExp  = prev.filter(t => t.amount < 0 && t.type !== 'transfer').reduce((s, t) => s + Math.abs(toCAD(t)), 0)
       const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100).toFixed(1) : null
 
+      // Roll subcategories up to their top-level (parent) category
+      const catById = {}
+      ;(allCategories || []).forEach(c => { catById[c.id] = c })
+      const rootCategory = t => {
+        const leaf = catById[t.category_id]
+        const root = leaf?.parent_id ? (catById[leaf.parent_id] || leaf) : leaf
+        return root || t.category   // fall back to the embedded category
+      }
+
       const catMap = {}
-      cur.filter(t => t.amount < 0 && t.type !== 'transfer' && t.category).forEach(t => {
-        const k = t.category.name
-        if (!catMap[k]) catMap[k] = { name: k, color: t.category.color || '#94a3b8', amount: 0 }
+      cur.filter(t => t.amount < 0 && t.type !== 'transfer' && (catById[t.category_id] || t.category)).forEach(t => {
+        const root = rootCategory(t)
+        const k = root.name
+        if (!catMap[k]) catMap[k] = { name: k, color: root.color || '#94a3b8', amount: 0 }
         catMap[k].amount += Math.abs(toCAD(t))
       })
       const topCats    = Object.values(catMap).sort((a, b) => b.amount - a.amount).slice(0, 6)
@@ -225,7 +235,7 @@ export default function Dashboard() {
       setLoading(false)
     }
     load()
-  }, [focusMonth, isFamily, myUserId])
+  }, [focusMonth, isFamily, myUserId, allCategories])
 
   const fmt  = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
   const fmtK = n => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n)
