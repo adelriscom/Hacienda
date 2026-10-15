@@ -1,0 +1,797 @@
+<title>Recurring Payments Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --paper:      #eef1f2;
+    --surface:    #ffffff;
+    --surface-2:  #f5f7f8;
+    --ink-0:      #101a1e;
+    --ink-1:      #3b4a51;
+    --ink-2:      #6a7c84;
+    --line:       #d8e0e3;
+    --line-soft:  #e7edef;
+    --accent:     #0d5f63;
+    --accent-ink: #0d5f63;
+    --accent-bg:  #e0eded;
+    --ok:         #1c7449;
+    --ok-bg:      #dfeee6;
+    --warn:       #8d5c00;
+    --warn-bg:    #f6ebd6;
+    --crit:       #a3322a;
+    --crit-bg:    #f6e1df;
+    --shadow:     0 1px 2px rgba(16, 26, 30, .05), 0 8px 24px -16px rgba(16, 26, 30, .25);
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body:    "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono:    "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0c1214;
+      --surface:    #141d20;
+      --surface-2:  #1a2428;
+      --ink-0:      #e9eff1;
+      --ink-1:      #b2c1c6;
+      --ink-2:      #7d9097;
+      --line:       #243236;
+      --line-soft:  #1d292d;
+      --accent:     #58b6ba;
+      --accent-ink: #7fcbce;
+      --accent-bg:  #11292b;
+      --ok:         #5cc392;
+      --ok-bg:      #122b21;
+      --warn:       #dba63f;
+      --warn-bg:    #2c2314;
+      --crit:       #e8796d;
+      --crit-bg:    #2e1a19;
+      --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0c1214;
+    --surface:    #141d20;
+    --surface-2:  #1a2428;
+    --ink-0:      #e9eff1;
+    --ink-1:      #b2c1c6;
+    --ink-2:      #7d9097;
+    --line:       #243236;
+    --line-soft:  #1d292d;
+    --accent:     #58b6ba;
+    --accent-ink: #7fcbce;
+    --accent-bg:  #11292b;
+    --ok:         #5cc392;
+    --ok-bg:      #122b21;
+    --warn:       #dba63f;
+    --warn-bg:    #2c2314;
+    --crit:       #e8796d;
+    --crit-bg:    #2e1a19;
+    --shadow:     0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink-1);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  .prose { max-width: 680px; }
+
+  h1, h2, h3, h4 { font-family: var(--display); color: var(--ink-0); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.08; letter-spacing: -.022em; font-weight: 700; }
+  h2 { font-size: clamp(22px, 3vw, 27px); line-height: 1.18; letter-spacing: -.014em; font-weight: 600; }
+  h3 { font-size: 17.5px; line-height: 1.3; letter-spacing: -.005em; font-weight: 600; }
+  h4 { font-size: 14px; line-height: 1.35; font-weight: 600; }
+  p  { margin: 0; }
+
+  code, .mono { font-family: var(--mono); font-size: .855em; }
+  code {
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: .08em .34em;
+    color: var(--ink-0);
+    word-break: break-word;
+  }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  header {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    margin-bottom: 48px;
+  }
+  .header-inner {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 56px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .lede { font-size: 19px; color: var(--ink-1); max-width: 660px; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    font-family: var(--display);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    padding-top: 6px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .meta b { color: var(--ink-1); font-weight: 600; }
+
+  /* ── Section rhythm ────────────────────────────────────── */
+  section { margin-bottom: 56px; }
+  .sec-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+  .sec-head p { color: var(--ink-2); font-size: 16px; max-width: 680px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .stack-lg { display: flex; flex-direction: column; gap: 28px; }
+
+  /* ── Verdict tiles ─────────────────────────────────────── */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(188px, 1fr));
+    gap: 12px;
+  }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    box-shadow: var(--shadow);
+  }
+  .tile-n {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.02em;
+    color: var(--ink-0);
+    font-variant-numeric: tabular-nums;
+  }
+  .tile-l { font-family: var(--display); font-size: 12.5px; font-weight: 600; color: var(--ink-0); }
+  .tile-s { font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+  .tile.crit .tile-n { color: var(--crit); }
+  .tile.warn .tile-n { color: var(--warn); }
+  .tile.ok   .tile-n { color: var(--ok); }
+
+  /* ── Lifecycle chains ──────────────────────────────────── */
+  .chains { display: flex; flex-direction: column; gap: 14px; }
+  .chain {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chain.actual { border-color: var(--accent); }
+  .chain-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .chain-note { font-size: 13.5px; color: var(--ink-2); }
+  .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .node {
+    font-family: var(--display);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 6px 11px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--ink-1);
+    white-space: nowrap;
+  }
+  .node.source { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-ink); }
+  .node.absent {
+    border-style: dashed;
+    color: var(--ink-2);
+    text-decoration: line-through;
+    text-decoration-color: var(--crit);
+    text-decoration-thickness: 1.5px;
+  }
+  .arrow { color: var(--ink-2); font-family: var(--mono); font-size: 13px; }
+
+  /* ── Tables ────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 580px; }
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    font-size: 15px;
+  }
+  th {
+    font-family: var(--display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.q { font-family: var(--display); font-size: 14px; font-weight: 600; color: var(--ink-0); width: 31%; }
+
+  /* ── Status chips ──────────────────────────────────────── */
+  .chip {
+    display: inline-block;
+    font-family: var(--display);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .chip.ok   { background: var(--ok-bg);   color: var(--ok); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.crit { background: var(--crit-bg); color: var(--crit); }
+  .chip.info { background: var(--accent-bg); color: var(--accent-ink); }
+
+  /* ── Defect cards — ranked by severity, so the numbers mean something ── */
+  .defect {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 16px;
+    box-shadow: var(--shadow);
+  }
+  .defect.high  { border-left-color: var(--crit); }
+  .defect.fixed { border-left-color: var(--ok); }
+  .defect.med  { border-left-color: var(--warn); }
+  .defect.low  { border-left-color: var(--ink-2); }
+  .rank {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    grid-row: span 3;
+    padding-top: 2px;
+  }
+  .defect-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .defect-body { font-size: 15px; color: var(--ink-1); }
+  .defect-where { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+
+  /* ── Verified list ─────────────────────────────────────── */
+  .checks { display: flex; flex-direction: column; gap: 1px; background: var(--line-soft); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .check { background: var(--surface); padding: 13px 18px; display: flex; gap: 13px; align-items: flex-start; }
+  .check-mark { color: var(--ok); font-family: var(--mono); font-weight: 600; font-size: 14px; padding-top: 2px; }
+  .check-txt { font-size: 15px; }
+  .check-txt b { font-family: var(--display); font-size: 14.5px; font-weight: 600; color: var(--ink-0); }
+
+  /* ── Recommendations ───────────────────────────────────── */
+  .recs { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+  .rec {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 17px 19px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: var(--shadow);
+  }
+  .rec p { font-size: 14.5px; color: var(--ink-1); }
+  .rec h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .note {
+    background: var(--accent-bg);
+    border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 15.5px;
+    color: var(--ink-1);
+  }
+  .note b { font-family: var(--display); font-weight: 600; color: var(--ink-0); }
+
+  ul.tight { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 15px; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    font-family: var(--display);
+  }
+
+  a { color: var(--accent-ink); text-underline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  @media (max-width: 620px) {
+    body { font-size: 16px; }
+    .header-inner { padding: 36px 20px 28px; }
+    .wrap { padding: 0 20px 64px; }
+    .defect { grid-template-columns: 1fr; gap: 7px; }
+    .rank { grid-row: auto; }
+  }
+</style>
+
+<header>
+  <div class="header-inner">
+    <span class="eyebrow">Hacienda · Integration Audit</span>
+    <h1>Recurring Payments Audit</h1>
+    <p class="lede">
+      How recurring payments actually work in Hacienda, how they reach Expenses and the
+      Dashboard, and where the implementation diverges from the model the brief assumes.
+      Every claim below was read out of the code, not inferred from naming.
+    </p>
+    <div class="meta">
+      <span><b>Scope</b> Recurring · Expenses · Dashboard</span>
+      <span><b>Read</b> 14 source files, 17 migrations</span>
+      <span><b>Date</b> 15 October 2026</span>
+      <span><b>Schema changes</b> none</span>
+      <span><b>Status</b> 2 of 6 defects fixed</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Headline</span>
+      <h2>There is no recurring-payment rule</h2>
+      <p>
+        <code>is_recurring</code> is a boolean column on <code>transactions</code>. The Recurring
+        screen is a derived view that loads flagged transactions and groups them by description.
+        Everything else follows from that one fact.
+      </p>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <span class="tile-n">0</span>
+        <span class="tile-l">Rule entities</span>
+        <span class="tile-s">No table, no row, no identity. A series exists only as transactions sharing a description.</span>
+      </div>
+      <div class="tile warn">
+        <span class="tile-n">3</span>
+        <span class="tile-l">Next-date engines</span>
+        <span class="tile-s">Recurring screen, notification bell and Dashboard each compute due dates differently.</span>
+      </div>
+      <div class="tile ok">
+        <span class="tile-n">1</span>
+        <span class="tile-l">Record type</span>
+        <span class="tile-s">Only a transaction row carries money, so obligations cannot be double-counted.</span>
+      </div>
+      <div class="tile crit">
+        <span class="tile-n">4</span>
+        <span class="tile-l">Defects still open</span>
+        <span class="tile-s">Of six found, the two that blocked day-to-day use are fixed; four consistency and structural gaps remain.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Lifecycle</span>
+      <h2>The arrow of causality runs backwards</h2>
+      <p>
+        The brief describes obligations flowing forward into expenses. Hacienda infers obligations
+        backwards out of expenses that already happened. Both chains end at the Dashboard, but
+        only one of them can schedule a bill you have never paid.
+      </p>
+    </div>
+    <div class="chains">
+      <div class="chain">
+        <div class="chain-head">
+          <h3>Model assumed by the brief</h3>
+          <span class="chip crit">Not implemented</span>
+        </div>
+        <div class="flow">
+          <span class="node absent">Recurring rule</span>
+          <span class="arrow">→</span>
+          <span class="node absent">Scheduled occurrence</span>
+          <span class="arrow">→</span>
+          <span class="node">Expense transaction</span>
+          <span class="arrow">→</span>
+          <span class="node absent">Payment confirmation</span>
+          <span class="arrow">→</span>
+          <span class="node">Dashboard</span>
+        </div>
+        <p class="chain-note">
+          Three of the five stages have no record behind them. <code>scheduled_payments</code> exists
+          in <code>001_schema.sql</code> and would fit the first two — but no frontend code reads or
+          writes it.
+        </p>
+      </div>
+
+      <div class="chain actual">
+        <div class="chain-head">
+          <h3>What Hacienda actually does</h3>
+          <span class="chip info">Verified</span>
+        </div>
+        <div class="flow">
+          <span class="node source">Expense transaction</span>
+          <span class="arrow">→</span>
+          <span class="node">Flagged <code>is_recurring</code></span>
+          <span class="arrow">→</span>
+          <span class="node">Series inferred by description</span>
+          <span class="arrow">→</span>
+          <span class="node">Occurrence projected</span>
+          <span class="arrow">→</span>
+          <span class="node">Status derived</span>
+          <span class="arrow">→</span>
+          <span class="node">Dashboard</span>
+        </div>
+        <p class="chain-note">
+          The transaction is the source, not the output. Nothing is generated, scheduled or written
+          ahead of time — the projection lives in memory only.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">FR-01</span>
+      <h2>Eight questions, answered from the code</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Question</th><th>What the implementation does</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="q">Create</td>
+            <td><code>Recurring.jsx</code> calls <code>addTransaction({…, is_recurring: true})</code>. This writes <b>one transaction</b> — an expense that has already happened — not a rule.</td>
+          </tr>
+          <tr>
+            <td class="q">Edit</td>
+            <td>Opens the standard transaction modal and updates that <b>single row</b>. There are no future occurrences to update, because none exist as records.</td>
+          </tr>
+          <tr>
+            <td class="q">Pause / resume</td>
+            <td><span class="chip crit">Absent</span> No <code>is_active</code> field, no status, no UI. A series can only be unflagged or deleted.</td>
+          </tr>
+          <tr>
+            <td class="q">Delete</td>
+            <td>“Remove from recurring” sets <code>is_recurring = false</code> on one row — see defect 1. Deleting the transaction removes history as well.</td>
+          </tr>
+          <tr>
+            <td class="q">Frequency</td>
+            <td>Never declared. <code>detectFrequency()</code> takes the median gap between observed dates and snaps it to the nearest of 7, 14, 15, 30, 91 or 365 days. A one-transaction series defaults to Monthly.</td>
+          </tr>
+          <tr>
+            <td class="q">Next payment date</td>
+            <td>Three implementations disagree — see defect 3. The Dashboard steps by calendar month; the other two add a fixed day count.</td>
+          </tr>
+          <tr>
+            <td class="q">Auto-generates expenses?</td>
+            <td><span class="chip ok">No — and this is correct</span> No cron, no trigger, no insert path. The flag is retrospective. <code>015_auto_categorize_trigger.sql</code> only assigns categories.</td>
+          </tr>
+          <tr>
+            <td class="q">Paid / partial / outstanding</td>
+            <td>Only the Dashboard knows. It matches real transactions against projected occurrences. The Recurring screen has no concept of payment status at all.</td>
+          </tr>
+          <tr>
+            <td class="q">Profile &amp; family</td>
+            <td>Via <code>transactions.user_id</code> plus a <code>person</code> label. RLS grants household-wide <code>SELECT</code> and own-only writes. The Recurring screen ignores the profile selector — see defect 2.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">FR-02 · Critical requirement</span>
+      <h2>Double counting cannot happen</h2>
+    </div>
+    <div class="stack">
+      <div class="note">
+        <b>Verified, with the reason.</b> Hacienda has exactly one record type that carries money:
+        a <code>transactions</code> row. Expenses, Reports, Budgets and the Dashboard's income and
+        expense figures all read that same row once. An “obligation” exists only as an in-memory
+        projection in <code>paymentSchedule.js</code>, and it is never added to any financial total —
+        the Upcoming Payments card's Scheduled and Outstanding figures are deliberately separate
+        from the Income and Expenses figures above it.
+      </div>
+      <p class="prose">
+        The flip side is that the system holds only two of the three concepts the brief asks it to
+        distinguish. It has actual expenses and derived obligations. It has no record of a
+        <b>payment applied to an obligation</b> — which is why “Paid” has to be inferred by matching
+        amounts rather than confirmed outright.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Findings</span>
+      <h2>Defects, ranked by impact</h2>
+      <p>Ranking is the structure here: 1 and 2 affected daily use and are now fixed; 3 and 4 make modules disagree; 5 and 6 are limits of the model itself.</p>
+    </div>
+    <div class="stack">
+
+      <div class="defect fixed">
+        <span class="rank">1</span>
+        <div class="defect-head">
+          <h3>Removing a series unflagged only one transaction</h3>
+          <span class="chip ok">Fixed</span>
+        </div>
+        <p class="defect-body">
+          <code>removeRecurring(id)</code> updated a single row, and the Recurring screen passed the
+          group's representative — the <b>newest</b> transaction. The other occurrences kept
+          <code>is_recurring = true</code>, so the series reappeared on refresh behind an older
+          representative, and clearing a year of a monthly bill took twelve clicks. It now takes the
+          grouped item and unflags every transaction in it.
+        </p>
+        <p class="defect-where">frontend/src/hooks/useRecurring.js · frontend/src/screens/Recurring.jsx</p>
+      </div>
+
+      <div class="defect fixed">
+        <span class="rank">2</span>
+        <div class="defect-head">
+          <h3>The Recurring screen ignored the profile selector</h3>
+          <span class="chip ok">Fixed</span>
+        </div>
+        <p class="defect-body">
+          It called <code>useRecurring()</code> with no argument, so <code>userId</code> stayed null
+          and the query returned the whole household — in Personal mode you saw the other member's
+          obligations. It now scopes the same way Transactions, Expenses, Calendar and the Dashboard
+          already do. <b>The notification bell still does not</b> — see defect 4.
+        </p>
+        <p class="defect-where">frontend/src/screens/Recurring.jsx</p>
+      </div>
+
+      <div class="defect med">
+        <span class="rank">3</span>
+        <div class="defect-head">
+          <h3>Three different next-date calculations</h3>
+          <span class="chip warn">Medium</span>
+        </div>
+        <p class="defect-body">
+          The Recurring screen uses <code>predictNext()</code> — last date plus N days. The
+          notification bell carries its own copy of that logic. The Dashboard steps by calendar
+          month. Day-stepping drifts: a bill due 31 January lands on 2 March instead of 28 February,
+          and the drift compounds every cycle. The three surfaces can show three different due dates
+          for the same bill.
+        </p>
+        <p class="defect-where">useRecurring.js · useNotifications.js · lib/paymentSchedule.js</p>
+      </div>
+
+      <div class="defect med">
+        <span class="rank">4</span>
+        <div class="defect-head">
+          <h3>“Overdue” on the Recurring screen ignores payment status</h3>
+          <span class="chip warn">Medium</span>
+        </div>
+        <p class="defect-body">
+          The badge is computed purely from the predicted date, with no reference to whether money
+          moved. A bill paid on time can read as Overdue there while the Dashboard correctly reads it
+          as Paid. The notification bell shares the flaw and additionally merges members, so one
+          household alert can describe two people's bills as one.
+        </p>
+        <p class="defect-where">frontend/src/screens/Recurring.jsx · frontend/src/hooks/useNotifications.js</p>
+      </div>
+
+      <div class="defect low">
+        <span class="rank">5</span>
+        <div class="defect-head">
+          <h3>An obligation is invisible until its first payment</h3>
+          <span class="chip info">Structural</span>
+        </div>
+        <p class="defect-body">
+          Because the series is inferred from transactions, a bill you have never paid cannot be
+          scheduled, and a cancelled subscription keeps projecting forward until it is unflagged.
+          This is a direct consequence of the backwards lifecycle, not a coding error.
+        </p>
+      </div>
+
+      <div class="defect low">
+        <span class="rank">6</span>
+        <div class="defect-head">
+          <h3>The description is the series identity</h3>
+          <span class="chip info">Structural</span>
+        </div>
+        <p class="defect-body">
+          Grouping keys on lowercased description plus owner. Renaming one transaction silently
+          splits a series in two; renaming two unrelated bills alike silently merges them. A variable
+          bill such as hydro also reads as Partially paid whenever it lands more than 2% below its
+          median.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Verified</span>
+      <h2>What is working correctly</h2>
+    </div>
+    <div class="checks">
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>No duplicated financial records.</b> One record type, read once by every total.</span>
+      </div>
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>Obligations stay out of expense totals.</b> Scheduled and Outstanding never enter Income or Expenses.</span>
+      </div>
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>Permissions hold.</b> Household-wide <code>SELECT</code>, own-only <code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>, unchanged.</span>
+      </div>
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>Currency conversion is centralised.</b> <code>toBase()</code> and <code>buildRateMap()</code> carry the default-rate fallback; nothing sums CAD and COP raw.</span>
+      </div>
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>Ownership resolves once.</b> A shared bill belongs to the member who pays it and is counted a single time.</span>
+      </div>
+      <div class="check">
+        <span class="check-mark">✓</span>
+        <span class="check-txt"><b>Period and status stay independent.</b> An unpaid October bill remains filed under October once November starts.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Delivered</span>
+      <h2>What changed</h2>
+      <p>
+        The Dashboard accordion, plus the two defect fixes. No scheduling or expense calculation was
+        altered, and no migration was added.
+      </p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>File</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="q mono">lib/paymentSchedule.js</td>
+            <td>Added <code>groupByOwner()</code>, refactoring the totals accumulation it shares with <code>groupByPeriod()</code> so member and month subtotals can never drift apart.</td>
+          </tr>
+          <tr>
+            <td class="q mono">screens/Dashboard.jsx</td>
+            <td>Two accordion levels — month, then family member. The per-row owner badge is gone, since the enclosing section now carries ownership.</td>
+          </tr>
+          <tr>
+            <td class="q mono">styles-dashboard.css</td>
+            <td>Accordion styling for both levels plus mobile rules; the dead owner-badge rule was removed.</td>
+          </tr>
+          <tr>
+            <td class="q mono">hooks/useRecurring.js</td>
+            <td><code>removeRecurring()</code> takes the grouped item and unflags every transaction in the series (defect 1).</td>
+          </tr>
+          <tr>
+            <td class="q mono">screens/Recurring.jsx</td>
+            <td>Scoped to the selected profile (defect 2), plus <code>rec-row</code> and <code>rec-name</code> hooks so a series can be targeted without leaning on DOM shape.</td>
+          </tr>
+          <tr>
+            <td class="q mono">tests/</td>
+            <td>31 unit tests over the derivation, 21 Playwright tests over the UI. The Supabase stub moved to <code>tests/fixtures/</code> and now records writes, so the removal tests can assert exactly which ids were sent. All pass.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack" style="margin-top: 16px;">
+      <div class="note">
+        <b>One rule worth knowing.</b> Grouping always runs over every occurrence, so month and
+        member totals describe the whole period. The Outstanding / All toggle decides which rows are
+        listed — it never changes what a period says is owed. A collapsed section therefore still
+        reports the truth, which is what makes the summaries usable without expanding anything.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Next</span>
+      <h2>Recommendations</h2>
+      <p>Ordered by how much each one unblocks. The first two close defects; the rest change the model.</p>
+    </div>
+    <div class="recs">
+      <div class="rec">
+        <h4>Fix defects 1 and 2 <span class="chip ok">Done</span></h4>
+        <p>
+          The whole series is now unflagged rather than one row, and the Recurring screen passes the
+          profile into <code>useRecurring()</code>. Neither needed a schema change.
+        </p>
+      </div>
+      <div class="rec">
+        <h4>One scheduling engine</h4>
+        <p>
+          Point the Recurring screen and the notification bell at <code>paymentSchedule.js</code> and
+          delete the two <code>predictNext</code> copies. This closes defects 3 and 4 together and
+          gives the three surfaces one source of truth.
+        </p>
+      </div>
+      <div class="rec">
+        <h4>Declare obligations</h4>
+        <p>
+          <code>scheduled_payments</code> already has name, amount, frequency, next date and
+          <code>is_active</code>. Adopting it gives real rules, a pause switch, exact expected
+          amounts, and bills that can be scheduled before they are first paid.
+        </p>
+      </div>
+      <div class="rec">
+        <h4>Record the application</h4>
+        <p>
+          A link from a transaction to the occurrence it settles turns “Paid” from an inference into
+          a fact, and makes partial payments explicit instead of implied by a shortfall.
+        </p>
+      </div>
+      <div class="rec">
+        <h4>Give a series a stable id</h4>
+        <p>
+          Once rules exist, point transactions at the rule instead of matching on description.
+          Renaming a bill stops splitting its history.
+        </p>
+      </div>
+      <div class="rec">
+        <h4>Split shared obligations</h4>
+        <p>
+          <code>person = 'Shared'</code> marks a bill as shared but does not model who owes what
+          share of it. Family subtotals currently attribute it wholly to its payer.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Open</span>
+      <h2>Outstanding issues</h2>
+    </div>
+    <ul class="tight prose">
+      <li>Defects 1 and 2 are fixed and covered by tests that fail on the old code. Defects 3 through 6 are reported, not fixed — the brief asked for findings before any business-logic change, and those four change how scheduling works.</li>
+      <li>16 Playwright tests across <code>status-badge</code>, <code>transfer-pairs</code> and the <code>verify-*</code> specs fail. Four need a <code>PW_PASSWORD</code> that is blank in <code>.env.test</code>; the rest rely on stale fixtures. Confirmed identical on a clean baseline, so none are caused by this work.</li>
+      <li>Member subtotals describe the whole period while the Outstanding filter hides settled rows. Intended, and the toggle sits directly above — but it is the one place a reader may need a second look.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Hacienda · Recurring Payments integration audit · Findings read from source at commit <span class="mono">ad86dca</span>
+  </footer>
+
+</div>

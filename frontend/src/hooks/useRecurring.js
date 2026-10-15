@@ -83,9 +83,13 @@ export function useRecurring({ userId = null } = {}) {
 
   useEffect(() => { load() }, [load])
 
-  async function removeRecurring(id) {
+  // Takes a grouped item and unflags every transaction in the series. Clearing
+  // only the group's representative would leave the rest flagged, and the series
+  // would simply reappear behind an older transaction.
+  async function removeRecurring(item) {
+    const ids = item?._txns?.length ? item._txns.map(t => t.id) : [item?.id ?? item]
     const { error } = await supabase
-      .from('transactions').update({ is_recurring: false }).eq('id', id)
+      .from('transactions').update({ is_recurring: false }).in('id', ids)
     if (error) throw error
     await load()
   }

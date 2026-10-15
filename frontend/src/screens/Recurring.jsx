@@ -5,13 +5,19 @@ import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
 import { useRecurring } from '../hooks/useRecurring'
 import { useTransactions } from '../hooks/useTransactions'
+import { useHousehold } from '../lib/household'
 
 const fmt     = n => '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtK    = n => Math.abs(n) >= 1000 ? `$${(Math.abs(n) / 1000).toFixed(1)}k` : fmt(n)
 const fmtDate = d => new Date(d).toLocaleDateString('en-CA', { day: 'numeric', month: 'short' })
 
 export default function Recurring() {
-  const { items, loading, removeRecurring, refresh } = useRecurring()
+  const { isFamily, myUserId } = useHousehold()
+  // Scoped to the selected profile, the same way Transactions, Expenses,
+  // Calendar and the Dashboard already are.
+  const { items, loading, removeRecurring, refresh } = useRecurring({
+    userId: isFamily ? null : myUserId,
+  })
   const { addTransaction, updateTransaction, deleteTransaction } = useTransactions()
   const { t } = useTranslation()
   const [showNew,     setShowNew]     = useState(false)
@@ -116,7 +122,7 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
   const isSoon     = daysUntil >= 0 && daysUntil <= 7
 
   return (
-    <div style={{
+    <div className="rec-row" style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 0',
       borderBottom: '1px solid var(--line)',
@@ -133,7 +139,7 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)',
+          <span className="rec-name" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
             {item.description}
           </span>
@@ -192,7 +198,7 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
         {confirming ? (
           <>
             <button className="btn ghost sm" style={{ fontSize: 11, color: 'var(--neg)' }}
-              onClick={() => onRemove(item.id)}>
+              onClick={() => onRemove(item)}>
               {t('recurring.confirm')}
             </button>
             <button className="btn ghost sm" style={{ fontSize: 11 }}

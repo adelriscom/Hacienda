@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  STATUS, buildSchedule, toObligation, groupByPeriod, occurrenceDate,
+  STATUS, buildSchedule, toObligation, groupByPeriod, groupByOwner, occurrenceDate,
   resolveStatus, startOfDay, isOutstanding, statusLabel,
 } from '../../src/lib/paymentSchedule.js'
 
@@ -332,4 +332,83 @@ test('income occurrences are tracked apart from obligation totals', () => {
   const oct = groupByPeriod(occs.filter(o => o.periodYm === '2026-10'))[0]
   assert.equal(oct.scheduledBase, 80)     // income excluded from obligations
   assert.equal(oct.inflowBase, 5000)
+})
+
+// ── Member grouping (accordion level 2) ──────────────────────────────────────
+
+test('groupByOwner splits a period by owner with per-member subtotals', () => {
+  const occs = schedule([
+    recurringItem({ id: 'a', user_id: 'alex', description: 'Mortgage', amount: -2000,
+      person: 'Alexander', payments: [['2026-08-25'], ['2026-09-25']] }),
+    recurringItem({ id: 'b', user_id: 'alex', description: 'Internet', amount: -80,
+      person: 'Alexander', payments: [['2026-09-18'], ['2026-10-18']] }),
+    recurringItem({ id: 'c', user_id: 'marcela', description: 'Insurance', amount: -250,
+      person: 'Marcela', payments: [['2026-09-05'], ['2026-10-05']] }),
+  ], '2026-10-28')
+
+  const groups = groupByOwner(occs.filter(o => o.periodYm === '2026-10'), a => a)
+  const byUser = Object.fromEntries(groups.map(g => [g.ownerUserId, g]))
+
+  assert.equal(groups.length, 2)
+  // Alexander: 2000 unpaid (Oct mortgage overdue) + 80 settled
+  assert.equal(byUser.alex.scheduledBase, 2080)
+  assert.equal(byUser.alex.paidBase, 80)
+  assert.equal(byUser.alex.outstandingBase, 2000)
+  assert.equal(byUser.alex.overdueCount, 1)
+  assert.equal(byUser.alex.occurrences.length, 2)
+  // Marcela: fully settled
+  assert.equal(byUser.marcela.scheduledBase, 250)
+  assert.equal(byUser.marcela.outstandingBase, 0)
+  assert.equal(byUser.marcela.overdueCount, 0)
+})
+
+test('member subtotals add up to the period total without duplication', () => {
+  const items = [
+    recurringItem({ id: 'a', user_id: 'alex', description: 'Mortgage', amount: -2000,
+      payments: [['2026-08-25'], ['2026-09-25'], ['2026-10-27', -1200]] }),
+    recurringItem({ id: 'b', user_id: 'marcela', description: 'Rent', amount: -1200,
+      payments: [['2026-09-08'], ['2026-10-08']] }),
+    // Shared bill: one member pays it, so it belongs to that member only.
+    recurringItem({ id: 'c', user_id: 'alex', description: 'Hydro', amount: -140,
+      person: 'Shared', payments: [['2026-09-10'], ['2026-10-10']] }),
+  ]
+  const oct = schedule(items, '2026-10-28').filter(o => o.periodYm === '2026-10')
+  const period  = groupByPeriod(oct)[0]
+  const members = groupByOwner(oct)
+
+  const sum = k => members.reduce((s, g) => s + g[k], 0)
+  assert.equal(sum('scheduledBase'),   period.scheduledBase)
+  assert.equal(sum('paidBase'),        period.paidBase)
+  assert.equal(sum('outstandingBase'), period.outstandingBase)
+  assert.equal(members.reduce((s, g) => s + g.occurrences.length, 0), period.occurrences.length)
+  // The shared bill lands under its payer once, not under every member.
+  const alex = members.find(g => g.ownerUserId === 'alex')
+  assert.equal(alex.occurrences.filter(o => o.obligation.person === 'Shared').length, 1)
+})
+
+test('groupByOwner converts currencies the same way groupByPeriod does', () => {
+  const convert = (a, cur) => (cur === 'COP' ? a * 0.00032 : a)
+  const occs = schedule([
+    recurringItem({ id: 'a', user_id: 'alex', description: 'Internet', amount: -80,
+      account: { name: 'Scotia', currency: 'CAD' },
+      payments: [['2026-09-18'], ['2026-10-18']] }),
+    recurringItem({ id: 'b', user_id: 'marcela', description: 'Celular', amount: -400000,
+      account: { name: 'Bancolombia', currency: 'COP' },
+      payments: [['2026-09-10'], ['2026-10-10']] }),
+  ], '2026-10-25')
+  const oct = occs.filter(o => o.periodYm === '2026-10')
+  const marcela = groupByOwner(oct, convert).find(g => g.ownerUserId === 'marcela')
+  assert.equal(Math.round(marcela.scheduledBase * 100) / 100, 128)
+  assert.equal(groupByOwner(oct, convert).reduce((s, g) => s + g.scheduledBase, 0),
+               groupByPeriod(oct, convert)[0].scheduledBase)
+})
+
+test('an unassigned obligation still forms its own group', () => {
+  const occs = schedule([recurringItem({
+    id: 'x', user_id: null, description: 'Storage', amount: -60, person: null,
+    payments: [['2026-09-14'], ['2026-10-14']],
+  })], '2026-10-20')
+  const groups = groupByOwner(occs.filter(o => o.periodYm === '2026-10'))
+  assert.equal(groups.length, 1)
+  assert.equal(groups[0].ownerUserId, null)
 })

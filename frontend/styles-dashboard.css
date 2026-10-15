@@ -299,18 +299,77 @@
   color: var(--ink-3);
 }
 
-.pay-period + .pay-period { margin-top: 18px; }
-.pay-period-h {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 0 2px 7px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+/* Level 1 — month accordion */
+.pay-month {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
 }
-.pay-period-id { min-width: 0; }
+.pay-month + .pay-month { margin-top: 10px; }
+.pay-month-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.pay-month-h:hover { background: var(--bg-2); }
+.pay-month-h:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pay-month-id { flex: 1; min-width: 0; }
+.pay-month-body {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Level 2 — family member accordion */
+.pay-member {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.pay-member-h {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  cursor: pointer;
+  user-select: none;
+}
+.pay-member-h:hover { background: var(--bg-3); }
+.pay-member-h:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pay-member-id { flex: 1; min-width: 0; }
+.pay-member-name { font-size: 12.5px; font-weight: 600; color: var(--ink-0); }
+.pay-member-meta { font-size: 10.5px; color: var(--ink-3); margin-top: 1px; }
+.pay-member-body { padding: 0 9px 9px; }
+.pay-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--accent) 22%, transparent);
+  color: var(--accent);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pay-chev {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-3);
+  transform: rotate(-90deg);
+  transition: transform .2s ease;
+}
+.pay-chev.open { transform: rotate(0deg); }
+
 .pay-period-title {
   font-size: 12px;
   font-weight: 700;
@@ -319,13 +378,17 @@
   color: var(--ink-0);
 }
 .pay-period-span { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
-.pay-period-tot {
+.pay-period-tot, .pay-member-tot {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
+  flex-shrink: 0;
   font-size: 11.5px;
 }
-.pay-period-tot .num { font-weight: 700; color: var(--ink-0); }
+.pay-member-tot { gap: 12px; font-size: 11px; }
+.pay-tot { white-space: nowrap; }
+.pay-period-tot .num, .pay-member-tot .num { font-weight: 700; color: var(--ink-0); }
+.pay-member-tot .num { font-weight: 600; }
 .pay-tot-label {
   color: var(--ink-3);
   margin-right: 5px;
@@ -355,16 +418,6 @@
   border-radius: 4px;
   white-space: nowrap;
 }
-.pay-owner {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--bg-3);
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
 .pay-progress { margin-top: 5px; max-width: 320px; }
 .pay-progress-bar {
   height: 4px;
@@ -409,8 +462,12 @@
   .pay-card .insight-h { flex-wrap: wrap; }
   .pay-toggle { width: 100%; }
   .pay-toggle .btn { flex: 1; }
-  .pay-period-h { align-items: flex-start; flex-direction: column; gap: 4px; }
-  .pay-period-tot { gap: 10px 14px; }
+  .pay-month-h { align-items: flex-start; flex-wrap: wrap; gap: 8px; padding: 10px 11px; }
+  .pay-month-id { flex: 1 1 60%; }
+  .pay-period-tot { flex-basis: 100%; gap: 10px 14px; }
+  .pay-month-body { padding: 8px; }
+  .pay-member-h { align-items: flex-start; flex-wrap: wrap; }
+  .pay-member-tot { flex-basis: 100%; gap: 10px 12px; padding-left: 33px; }
   .pay-row { gap: 10px; padding: 10px; }
   .pay-progress { max-width: none; }
 }
