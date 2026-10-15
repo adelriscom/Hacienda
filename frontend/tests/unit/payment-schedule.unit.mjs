@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import {
   STATUS, buildSchedule, toObligation, groupByPeriod, groupByOwner, occurrenceDate,
   resolveStatus, startOfDay, isOutstanding, statusLabel, currentOccurrences,
+  obligationFromRule, parseDateOnly,
 } from '../../src/lib/paymentSchedule.js'
 
 const day = (s) => startOfDay(new Date(`${s}T12:00:00`))
@@ -492,4 +493,185 @@ test('a settled series never reports overdue', () => {
   const occ = [...current.values()][0]
   assert.equal(occ.isOverdue, false)
   assert.notEqual(occ.status, STATUS.OVERDUE)
+})
+
+// ── Declared obligations (phase 3) ──────────────────────────────────────────
+
+// A scheduled_payments row as the hook hands it over.
+function rule({
+  id = 'r1', user_id = 'alex', name = 'Mortgage', amount = 2000, type = 'expense',
+  frequency = 'monthly', anchor_date = '2026-08-10', ends_on = null,
+  is_active = true, is_variable = false, person = null,
+  account = { name: 'Scotia', currency: 'CAD' },
+}) {
+  return { id, user_id, name, amount, type, frequency, anchor_date, ends_on,
+           is_active, is_variable, person, account }
+}
+
+const txn = (id, date, amount) => ({ id, occurred_at: `${date}T12:00:00`, amount })
+
+const declaredSchedule = (rules, today, opts = {}) =>
+  buildSchedule(rules.map(([r, linked]) => obligationFromRule(r, linked || [])),
+                { today: day(today), ...opts })
+
+test('a declared rule projects with no payments at all', () => {
+  // The thing an inferred series could never do: schedule a bill never paid.
+  const occs = declaredSchedule([[rule({ anchor_date: '2026-10-10' })]], '2026-10-14')
+  assert.ok(occs.length >= 3, `expected future occurrences, got ${occs.length}`)
+  assert.equal(occs[0].periodYm, '2026-10')
+  assert.equal(occs[0].status, STATUS.OVERDUE)   // due the 10th, today is the 14th
+  assert.equal(occs[0].scheduled, 2000)
+  assert.equal(find(occs, 'Mortgage', '2026-11').status, STATUS.UPCOMING)
+})
+
+test('the declared amount wins over the median of history', () => {
+  // Three payments of 1800, but the rule says the obligation is worth 2000.
+  const occs = declaredSchedule([[
+    rule({ amount: 2000 }),
+    [txn('t1', '2026-08-10', -1800), txn('t2', '2026-09-10', -1800)],
+  ]], '2026-10-14')
+  const sep = find(occs, 'Mortgage', '2026-09')
+  assert.equal(sep.scheduled, 2000)
+  assert.equal(sep.paid, 1800)
+  assert.equal(sep.status, STATUS.PARTIAL)
+  assert.equal(sep.remaining, 200)
+})
+
+test('a declared anchor does not drift when a payment lands late', () => {
+  // Paid on the 27th; an inferred series would re-anchor toward it, a rule won't.
+  const occs = declaredSchedule([[
+    rule({ anchor_date: '2026-08-10' }),
+    [txn('t1', '2026-08-10', -2000), txn('t2', '2026-09-27', -2000)],
+  ]], '2026-10-14')
+  assert.equal(+find(occs, 'Mortgage', '2026-09').dueDate, +day('2026-09-10'))
+  assert.equal(+find(occs, 'Mortgage', '2026-10').dueDate, +day('2026-10-10'))
+})
+
+test('nothing is projected before the rule starts', () => {
+  const occs = declaredSchedule([[rule({ anchor_date: '2026-10-10' })]], '2026-10-14',
+                                { monthsBack: 3, monthsAhead: 1 })
+  assert.deepEqual([...new Set(occs.map(o => o.periodYm))], ['2026-10', '2026-11'])
+})
+
+test('an ended rule keeps its history and stops projecting', () => {
+  const occs = declaredSchedule([[
+    rule({ name: 'Old Gym', amount: 45, anchor_date: '2026-08-20', ends_on: '2026-09-20' }),
+    [txn('t1', '2026-08-20', -45), txn('t2', '2026-09-20', -45)],
+  ]], '2026-10-14')
+  const periods = [...new Set(occs.map(o => o.periodYm))]
+  assert.deepEqual(periods, ['2026-08', '2026-09'])   // nothing from October on
+  assert.ok(occs.every(o => o.status === STATUS.PAID))
+})
+
+test('a paused rule stops at today but keeps what came before', () => {
+  const occs = declaredSchedule([[
+    rule({ anchor_date: '2026-08-10', is_active: false }),
+    [txn('t1', '2026-08-10', -2000), txn('t2', '2026-09-10', -2000)],
+  ]], '2026-10-14')
+  const periods = [...new Set(occs.map(o => o.periodYm))]
+  assert.ok(periods.includes('2026-08') && periods.includes('2026-09'))
+  assert.ok(!periods.includes('2026-11'), 'a paused rule must not project forward')
+})
+
+test('any payment settles a variable obligation', () => {
+  // Hydro: estimate 140, actual 90. Not a shortfall — that is just the bill.
+  const occs = declaredSchedule([[
+    rule({ name: 'Hydro', amount: 140, is_variable: true, anchor_date: '2026-08-05' }),
+    [txn('t1', '2026-08-05', -90), txn('t2', '2026-09-05', -205)],
+  ]], '2026-10-14')
+  const aug = find(occs, 'Hydro', '2026-08')
+  const sep = find(occs, 'Hydro', '2026-09')
+  assert.equal(aug.status, STATUS.PAID)
+  assert.equal(aug.remaining, 0)
+  // A settled variable period is worth what it actually cost, so totals are real.
+  assert.equal(aug.scheduled, 90)
+  assert.equal(sep.scheduled, 205)
+  // The future stays an estimate.
+  assert.equal(find(occs, 'Hydro', '2026-11').scheduled, 140)
+})
+
+test('a variable obligation still goes overdue when nothing is paid', () => {
+  const occs = declaredSchedule([[
+    rule({ name: 'Hydro', amount: 140, is_variable: true, anchor_date: '2026-08-05' }),
+    [txn('t1', '2026-08-05', -90)],
+  ]], '2026-10-14')
+  assert.equal(find(occs, 'Hydro', '2026-09').status, STATUS.OVERDUE)
+  assert.equal(find(occs, 'Hydro', '2026-10').status, STATUS.OVERDUE)
+})
+
+test('every scheduled_payments frequency maps to a cadence', () => {
+  const expect = { weekly: 7, biweekly: 14, semimonthly: 15, monthly: 30, quarterly: 91, yearly: 365 }
+  for (const [word, days] of Object.entries(expect)) {
+    const ob = obligationFromRule(rule({ frequency: word }))
+    assert.equal(ob.freqDays, days, `${word} should step ${days} days`)
+    assert.ok(ob.freqLabel.length > 0)
+  }
+  // An unknown word falls back to monthly rather than producing NaN dates.
+  assert.equal(obligationFromRule(rule({ frequency: 'fortnightly' })).freqDays, 30)
+})
+
+test('income rules carry inflow wording', () => {
+  const ob = obligationFromRule(rule({ name: 'Salary', amount: 5000, type: 'income' }))
+  assert.equal(ob.isIncome, true)
+  assert.equal(statusLabel(STATUS.PAID, ob.isIncome), 'Received')
+})
+
+test('declared and inferred obligations coexist in one schedule', () => {
+  const declared = obligationFromRule(
+    rule({ id: 'r1', name: 'Mortgage', amount: 2000, anchor_date: '2026-08-10' }),
+    [txn('t1', '2026-08-10', -2000), txn('t2', '2026-09-10', -2000)])
+  const legacy = toObligation(recurringItem({
+    id: 'x', user_id: 'alex', description: 'Internet', amount: -80,
+    payments: [['2026-09-12'], ['2026-10-12']],
+  }))
+  const occs = buildSchedule([declared, legacy], { today: day('2026-10-14') })
+
+  assert.equal(find(occs, 'Mortgage', '2026-10').status, STATUS.OVERDUE)
+  assert.equal(find(occs, 'Internet', '2026-10').status, STATUS.PAID)
+  // Totals add both without the declared one being counted twice.
+  const oct = groupByPeriod(occs.filter(o => o.periodYm === '2026-10'))[0]
+  assert.equal(oct.scheduledBase, 2080)
+  assert.equal(oct.occurrences.length, 2)
+})
+
+test('a linked transaction settles its rule and nothing else', () => {
+  const occs = declaredSchedule([
+    [rule({ id: 'r1', name: 'Mortgage', amount: 2000, anchor_date: '2026-08-10' }),
+     [txn('t1', '2026-08-10', -2000)]],
+    [rule({ id: 'r2', name: 'Rent', amount: 1200, anchor_date: '2026-08-08' }), []],
+  ], '2026-10-14')
+  const ids = occs.flatMap(o => o.payments.map(p => p.id))
+  assert.equal(ids.length, new Set(ids).size)
+  assert.equal(find(occs, 'Rent', '2026-08').paid, 0)
+  assert.equal(find(occs, 'Mortgage', '2026-08').paid, 2000)
+})
+
+test('a date-only column is a calendar date, not a UTC instant', () => {
+  // `new Date('2026-08-10')` is UTC midnight, which is 9 August anywhere west of
+  // Greenwich. Left unhandled, every declared due date shifts a day earlier.
+  assert.equal(+parseDateOnly('2026-08-10'), +day('2026-08-10'))
+  assert.equal(parseDateOnly('2026-08-10').getDate(), 10)
+  assert.equal(parseDateOnly('2026-01-01').getMonth(), 0)
+  assert.equal(parseDateOnly('2026-12-31').getDate(), 31)
+
+  const ob = obligationFromRule(rule({ anchor_date: '2026-08-10', ends_on: '2026-12-10' }))
+  assert.equal(ob.anchorDate.getDate(), 10)
+  assert.equal(ob.endsOn.getDate(), 10)
+})
+
+test('direction comes from type, never from the sign of the stored amount', () => {
+  // scheduled_payments.amount is a positive magnitude. Reading its sign would
+  // make every expense rule look like income and drop it from obligation totals.
+  const expense = obligationFromRule(rule({ amount: 2000, type: 'expense' }))
+  assert.equal(expense.isIncome, false)
+
+  const income = obligationFromRule(rule({ amount: 5000, type: 'income' }))
+  assert.equal(income.isIncome, true)
+
+  const occs = buildSchedule([obligationFromRule(
+    rule({ amount: 2000, type: 'expense', anchor_date: '2026-08-10' }))],
+    { today: day('2026-10-14') })
+  const oct = groupByPeriod(occs.filter(o => o.periodYm === '2026-10'))[0]
+  assert.equal(oct.scheduledBase, 2000)   // counted as an obligation
+  assert.equal(oct.inflowBase, 0)         // not as income
 })

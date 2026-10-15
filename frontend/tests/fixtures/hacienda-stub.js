@@ -104,6 +104,12 @@ const SESSION = {
   },
 }
 
+// Declared obligations served from scheduled_payments. Empty by default, so the
+// existing suites keep exercising the inferred path; a test that wants rules
+// passes them to openApp/openDashboard.
+let rulesFixture = []
+export function setRules(rules) { rulesFixture = rules || [] }
+
 // Serves the handful of tables these screens touch; everything else comes back
 // empty so no screen can crash on a missing stub. Writes are recorded rather
 // than applied — `writes` lets a test assert exactly what was sent.
@@ -139,8 +145,14 @@ export async function stubSupabase(page, viewMode, writes = []) {
       body = [{ id: HOUSE, name: 'Delrisco-Falla' }]
     } else if (table === 'exchange_rates') {
       body = RATES
+    } else if (table === 'scheduled_payments') {
+      body = rulesFixture
+      const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
+      if (owner) body = body.filter(r => r.user_id === owner[1])
     } else if (table === 'transactions') {
-      body = query.includes('is_recurring=eq.true') ? recurringRows() : []
+      // Matches both `is_recurring=eq.true` and the or(...) form the hook uses
+      // once declared obligations are in play.
+      body = query.includes('is_recurring') ? recurringRows() : []
       // The personal profile filters server-side; mirror that here.
       const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
       if (owner) body = body.filter(r => r.user_id === owner[1])
@@ -163,14 +175,15 @@ export async function stubSupabase(page, viewMode, writes = []) {
 }
 
 // Boots the app at `route` with the clock pinned and the stub installed.
-export async function openApp(page, route, viewMode = 'family', writes = []) {
+export async function openApp(page, route, viewMode = 'family', writes = [], rules = []) {
+  setRules(rules)
   await page.clock.setFixedTime(new Date(`${TODAY}T10:00:00`))
   await stubSupabase(page, viewMode, writes)
   await page.goto(route)
 }
 
-export async function openDashboard(page, viewMode = 'family') {
-  await openApp(page, '/', viewMode)
+export async function openDashboard(page, viewMode = 'family', rules = []) {
+  await openApp(page, '/', viewMode, [], rules)
   await page.waitForSelector('.pay-card', { timeout: 20000 })
   // HouseholdProvider resolves the household asynchronously, so the card renders
   // personal-scoped for an instant before Family mode settles. Wait for the
