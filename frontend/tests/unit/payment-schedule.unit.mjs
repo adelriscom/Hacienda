@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   STATUS, buildSchedule, toObligation, groupByPeriod, groupByOwner, occurrenceDate,
-  resolveStatus, startOfDay, isOutstanding, statusLabel,
+  resolveStatus, startOfDay, isOutstanding, statusLabel, currentOccurrences,
 } from '../../src/lib/paymentSchedule.js'
 
 const day = (s) => startOfDay(new Date(`${s}T12:00:00`))
@@ -411,4 +411,85 @@ test('an unassigned obligation still forms its own group', () => {
   const groups = groupByOwner(occs.filter(o => o.periodYm === '2026-10'))
   assert.equal(groups.length, 1)
   assert.equal(groups[0].ownerUserId, null)
+})
+
+// ── currentOccurrences — what a per-series view should show ─────────────────
+
+const currentFor = (items, today) =>
+  currentOccurrences(schedule(items, today), day(today))
+
+test('an unpaid past-due occurrence is the one that needs attention', () => {
+  const current = currentFor([recurringItem({
+    payments: [['2026-07-25'], ['2026-08-25'], ['2026-09-25']],
+  })], '2026-11-01')
+  const occ = [...current.values()][0]
+  assert.equal(occ.status, STATUS.OVERDUE)
+  assert.equal(occ.periodYm, '2026-10')   // not the already-settled September
+})
+
+test('with everything settled, the next one due is shown', () => {
+  const current = currentFor([recurringItem({
+    description: 'Internet', amount: -80,
+    payments: [['2026-08-12'], ['2026-09-12'], ['2026-10-12']],
+  })], '2026-10-14')
+  const occ = [...current.values()][0]
+  assert.equal(occ.status, STATUS.UPCOMING)
+  assert.equal(+occ.dueDate, +day('2026-11-12'))
+  // The old engine added 30 days to the last payment and landed on Nov 11.
+  assert.notEqual(+occ.dueDate, +day('2026-11-11'))
+})
+
+test('an outstanding occurrence wins over a later unpaid one', () => {
+  const current = currentFor([recurringItem({
+    payments: [['2026-08-25'], ['2026-09-25']],
+  })], '2026-11-20')
+  const occ = [...current.values()][0]
+  // October and November are both unpaid; October is what is owed first.
+  assert.equal(occ.periodYm, '2026-10')
+  assert.equal(occ.status, STATUS.OVERDUE)
+})
+
+test('a partly paid occurrence stays current until it is settled', () => {
+  const current = currentFor([recurringItem({
+    payments: [['2026-07-25'], ['2026-08-25'], ['2026-09-25'], ['2026-10-27', -1200]],
+  })], '2026-11-05')
+  const occ = [...current.values()][0]
+  assert.equal(occ.status, STATUS.PARTIAL)
+  assert.equal(occ.isOverdue, true)
+  assert.equal(occ.remaining, 800)
+  assert.equal(occ.periodYm, '2026-10')
+})
+
+test('each obligation gets exactly one current occurrence', () => {
+  const current = currentFor([
+    recurringItem({ id: 'a', user_id: 'alex', description: 'Mortgage', amount: -2000,
+      payments: [['2026-08-10'], ['2026-09-10']] }),
+    recurringItem({ id: 'b', user_id: 'marcela', description: 'Rent', amount: -1200,
+      payments: [['2026-09-08'], ['2026-10-08']] }),
+    // Same description, different owner — still its own series.
+    recurringItem({ id: 'c', user_id: 'alex', description: 'Rent', amount: -900,
+      payments: [['2026-09-03'], ['2026-10-03']] }),
+  ], '2026-10-14')
+  assert.equal(current.size, 3)
+  assert.equal(new Set([...current.values()].map(o => o.obligation.key)).size, 3)
+})
+
+test('due today is reported as due today, not overdue', () => {
+  const current = currentFor([recurringItem({
+    description: 'Gym', amount: -45,
+    payments: [['2026-08-14'], ['2026-09-14']],
+  })], '2026-10-14')
+  assert.equal([...current.values()][0].status, STATUS.DUE_TODAY)
+})
+
+test('a settled series never reports overdue', () => {
+  // The defect: the Recurring screen called a paid bill overdue because it only
+  // looked at the predicted date.
+  const current = currentFor([recurringItem({
+    description: 'Internet', amount: -80,
+    payments: [['2026-08-12'], ['2026-09-12'], ['2026-10-12']],
+  })], '2026-10-20')
+  const occ = [...current.values()][0]
+  assert.equal(occ.isOverdue, false)
+  assert.notEqual(occ.status, STATUS.OVERDUE)
 })

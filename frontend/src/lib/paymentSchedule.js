@@ -304,3 +304,28 @@ export function groupByOwner(occurrences, convert = a => a) {
 }
 
 export const isOutstanding = o => o.status !== STATUS.PAID
+
+// The one occurrence per obligation that needs attention now: the earliest that
+// is still outstanding, or — when the whole window is settled — the next one
+// due. Keyed by obligation key. This is what a per-series view (the Recurring
+// screen, the notification bell) should show, so every surface reads the same
+// schedule the Dashboard does.
+export function currentOccurrences(occurrences, today = new Date()) {
+  const t0     = startOfDay(today)
+  const groups = new Map()
+  occurrences.forEach(o => {
+    const list = groups.get(o.obligation.key)
+    if (list) list.push(o)
+    else groups.set(o.obligation.key, [o])
+  })
+
+  const out = new Map()
+  groups.forEach((list, key) => {
+    // buildSchedule returns occurrences in due-date order, so find() takes the
+    // earliest match in both passes.
+    out.set(key, list.find(isOutstanding)
+               || list.find(o => o.dueDate >= t0)
+               || list[list.length - 1])
+  })
+  return out
+}

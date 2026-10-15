@@ -147,7 +147,11 @@
     "overdue": "Overdue",
     "inDays": "In {{n}} days",
     "remove": "Remove from recurring",
-    "confirm": "Confirm remove"
+    "confirm": "Confirm remove",
+    "paid": "Paid", "partial": "Partially paid", "dueToday": "Due today",
+    "received": "Received", "notReceived": "Not received",
+    "upcoming": "Upcoming",
+    "due": "Due", "left": "left"
   },
   "review": {
     "title": "Review",

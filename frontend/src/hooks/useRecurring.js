@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { toObligation, buildSchedule, currentOccurrences } from '../lib/paymentSchedule'
 
 const FREQUENCIES = [
   { days: 7,   label: 'Weekly' },
@@ -23,17 +24,37 @@ export function detectFrequency(dates) {
   )
 }
 
-export function predictNext(lastDateStr, frequencyDays) {
-  const d = new Date(lastDateStr)
-  d.setDate(d.getDate() + frequencyDays)
-  return d
+// Collapses recurring transaction rows into one series each, keyed by owner as
+// well as description: two household members paying their own "Internet" are two
+// obligations, not one merged row. Exported so the notification bell builds the
+// same series the screens do.
+export function groupRecurring(rows) {
+  const groups = new Map()
+  ;(rows || []).forEach(t => {
+    const key = `${t.user_id || ''}|${t.description.toLowerCase().trim()}`
+    const g   = groups.get(key)
+    if (g) {
+      g._dates.push(t.occurred_at)
+      g._txns.push(t)
+    } else {
+      groups.set(key, { ...t, _key: key, _dates: [t.occurred_at], _txns: [t] })
+    }
+  })
+
+  return [...groups.values()]
+    .map(item => ({ ...item, _count: item._dates.length, _freq: detectFrequency(item._dates) }))
+    .sort((a, b) => {
+      if ((a.amount > 0) !== (b.amount > 0)) return a.amount > 0 ? -1 : 1
+      return Math.abs(b.amount) - Math.abs(a.amount)
+    })
 }
 
 // `userId` scopes the result to one profile's own recurring transactions; pass
 // null (the default) for the whole household, which is what RLS already allows.
 export function useRecurring({ userId = null } = {}) {
-  const [items,   setItems]   = useState([])
-  const [loading, setLoading] = useState(true)
+  const [items,       setItems]       = useState([])
+  const [occurrences, setOccurrences] = useState([])
+  const [loading,     setLoading]     = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -48,36 +69,12 @@ export function useRecurring({ userId = null } = {}) {
     if (userId) query = query.eq('user_id', userId)
     const { data } = await query
 
-    // Keyed by owner as well as description: two household members paying their
-    // own "Internet" are two obligations, not one merged row.
-    const groups = new Map()
-    ;(data || []).forEach(t => {
-      const key = `${t.user_id || ''}|${t.description.toLowerCase().trim()}`
-      if (!groups.has(key))
-        groups.set(key, { ...t, _key: key, _dates: [t.occurred_at], _txns: [t] })
-      else {
-        const g = groups.get(key)
-        g._dates.push(t.occurred_at)
-        g._txns.push(t)
-      }
-    })
+    const grouped  = groupRecurring(data)
+    const schedule = buildSchedule(grouped.map(toObligation))
+    const current  = currentOccurrences(schedule)
 
-    const result = [...groups.values()].map(item => {
-      const freq = detectFrequency(item._dates)
-      return {
-        ...item,
-        _count:    item._dates.length,
-        _freq:     freq,
-        _nextDate: predictNext(item.occurred_at, freq.days),
-      }
-    })
-
-    result.sort((a, b) => {
-      if ((a.amount > 0) !== (b.amount > 0)) return a.amount > 0 ? -1 : 1
-      return Math.abs(b.amount) - Math.abs(a.amount)
-    })
-
-    setItems(result)
+    setItems(grouped.map(item => ({ ...item, _occurrence: current.get(item._key) || null })))
+    setOccurrences(schedule)
     setLoading(false)
   }, [userId])
 
@@ -94,5 +91,5 @@ export function useRecurring({ userId = null } = {}) {
     await load()
   }
 
-  return { items, loading, removeRecurring, refresh: load }
+  return { items, occurrences, loading, removeRecurring, refresh: load }
 }
