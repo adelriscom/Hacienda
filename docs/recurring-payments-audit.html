@@ -278,7 +278,8 @@
     gap: 4px 16px;
     box-shadow: var(--shadow);
   }
-  .defect.high { border-left-color: var(--crit); }
+  .defect.high  { border-left-color: var(--crit); }
+  .defect.fixed { border-left-color: var(--ok); }
   .defect.med  { border-left-color: var(--warn); }
   .defect.low  { border-left-color: var(--ink-2); }
   .rank {
@@ -314,6 +315,7 @@
     box-shadow: var(--shadow);
   }
   .rec p { font-size: 14.5px; color: var(--ink-1); }
+  .rec h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
   .note {
     background: var(--accent-bg);
@@ -361,6 +363,7 @@
       <span><b>Read</b> 14 source files, 17 migrations</span>
       <span><b>Date</b> 15 October 2026</span>
       <span><b>Schema changes</b> none</span>
+      <span><b>Status</b> 2 of 6 defects fixed</span>
     </div>
   </div>
 </header>
@@ -394,9 +397,9 @@
         <span class="tile-s">Only a transaction row carries money, so obligations cannot be double-counted.</span>
       </div>
       <div class="tile crit">
-        <span class="tile-n">6</span>
-        <span class="tile-l">Defects found</span>
-        <span class="tile-s">Two block correct day-to-day use; four are consistency or structural gaps.</span>
+        <span class="tile-n">4</span>
+        <span class="tile-l">Defects still open</span>
+        <span class="tile-s">Of six found, the two that blocked day-to-day use are fixed; four consistency and structural gaps remain.</span>
       </div>
     </div>
   </section>
@@ -540,36 +543,37 @@
     <div class="sec-head">
       <span class="eyebrow">Findings</span>
       <h2>Defects, ranked by impact</h2>
-      <p>Ranking is the structure here: 1 and 2 affect daily use, 3 and 4 make modules disagree, 5 and 6 are limits of the model itself.</p>
+      <p>Ranking is the structure here: 1 and 2 affected daily use and are now fixed; 3 and 4 make modules disagree; 5 and 6 are limits of the model itself.</p>
     </div>
     <div class="stack">
 
-      <div class="defect high">
+      <div class="defect fixed">
         <span class="rank">1</span>
         <div class="defect-head">
-          <h3>Removing a series unflags only one transaction</h3>
-          <span class="chip crit">High</span>
+          <h3>Removing a series unflagged only one transaction</h3>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          <code>removeRecurring(id)</code> updates a single row, and the Recurring screen passes the
-          group's representative — the <b>newest</b> transaction. The other occurrences keep
-          <code>is_recurring = true</code>, so the series reappears on refresh with an older
-          representative. Clearing a year of a monthly bill takes twelve clicks.
+          <code>removeRecurring(id)</code> updated a single row, and the Recurring screen passed the
+          group's representative — the <b>newest</b> transaction. The other occurrences kept
+          <code>is_recurring = true</code>, so the series reappeared on refresh behind an older
+          representative, and clearing a year of a monthly bill took twelve clicks. It now takes the
+          grouped item and unflags every transaction in it.
         </p>
         <p class="defect-where">frontend/src/hooks/useRecurring.js · frontend/src/screens/Recurring.jsx</p>
       </div>
 
-      <div class="defect high">
+      <div class="defect fixed">
         <span class="rank">2</span>
         <div class="defect-head">
-          <h3>The Recurring screen ignores the profile selector</h3>
-          <span class="chip crit">High</span>
+          <h3>The Recurring screen ignored the profile selector</h3>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          It calls <code>useRecurring()</code> with no argument, so <code>userId</code> stays null and
-          the query returns the whole household. In Personal mode you see the other member's
-          obligations. Transactions, Expenses, Calendar and the Dashboard all scope correctly; this
-          screen and the notification bell do not.
+          It called <code>useRecurring()</code> with no argument, so <code>userId</code> stayed null
+          and the query returned the whole household — in Personal mode you saw the other member's
+          obligations. It now scopes the same way Transactions, Expenses, Calendar and the Dashboard
+          already do. <b>The notification bell still does not</b> — see defect 4.
         </p>
         <p class="defect-where">frontend/src/screens/Recurring.jsx</p>
       </div>
@@ -671,10 +675,10 @@
   <section>
     <div class="sec-head">
       <span class="eyebrow">Delivered</span>
-      <h2>The accordion, and what it rests on</h2>
+      <h2>What changed</h2>
       <p>
-        Only the Dashboard presentation changed. No recurring or expense business logic was touched,
-        and no migration was added.
+        The Dashboard accordion, plus the two defect fixes. No scheduling or expense calculation was
+        altered, and no migration was added.
       </p>
     </div>
     <div class="table-wrap">
@@ -696,8 +700,16 @@
             <td>Accordion styling for both levels plus mobile rules; the dead owner-badge rule was removed.</td>
           </tr>
           <tr>
+            <td class="q mono">hooks/useRecurring.js</td>
+            <td><code>removeRecurring()</code> takes the grouped item and unflags every transaction in the series (defect 1).</td>
+          </tr>
+          <tr>
+            <td class="q mono">screens/Recurring.jsx</td>
+            <td>Scoped to the selected profile (defect 2), plus <code>rec-row</code> and <code>rec-name</code> hooks so a series can be targeted without leaning on DOM shape.</td>
+          </tr>
+          <tr>
             <td class="q mono">tests/</td>
-            <td>31 unit tests over the derivation, 14 Playwright tests over the UI. All pass.</td>
+            <td>31 unit tests over the derivation, 21 Playwright tests over the UI. The Supabase stub moved to <code>tests/fixtures/</code> and now records writes, so the removal tests can assert exactly which ids were sent. All pass.</td>
           </tr>
         </tbody>
       </table>
@@ -720,11 +732,10 @@
     </div>
     <div class="recs">
       <div class="rec">
-        <h4>Fix defects 1 and 2</h4>
+        <h4>Fix defects 1 and 2 <span class="chip ok">Done</span></h4>
         <p>
-          Unflag the whole series rather than one row, and pass the profile into
-          <code>useRecurring()</code> on the Recurring screen. Both are small and need no schema
-          change. <b>Do these first.</b>
+          The whole series is now unflagged rather than one row, and the Recurring screen passes the
+          profile into <code>useRecurring()</code>. Neither needed a schema change.
         </p>
       </div>
       <div class="rec">
@@ -773,7 +784,7 @@
       <h2>Outstanding issues</h2>
     </div>
     <ul class="tight prose">
-      <li>Defects 1 through 6 are reported, not fixed — the brief asked for findings before any business-logic change.</li>
+      <li>Defects 1 and 2 are fixed and covered by tests that fail on the old code. Defects 3 through 6 are reported, not fixed — the brief asked for findings before any business-logic change, and those four change how scheduling works.</li>
       <li>16 Playwright tests across <code>status-badge</code>, <code>transfer-pairs</code> and the <code>verify-*</code> specs fail. Four need a <code>PW_PASSWORD</code> that is blank in <code>.env.test</code>; the rest rely on stale fixtures. Confirmed identical on a clean baseline, so none are caused by this work.</li>
       <li>Member subtotals describe the whole period while the Outstanding filter hides settled rows. Intended, and the toggle sits directly above — but it is the one place a reader may need a second look.</li>
     </ul>
