@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  groupRecurring, toObligation, obligationFromRule, buildSchedule, currentOccurrences,
+  groupRecurring, toObligation, obligationFromRule, ruleFromObligation,
+  buildSchedule, currentOccurrences,
 } from '../lib/paymentSchedule'
 
 // `userId` scopes the result to one profile's own recurring transactions; pass
@@ -108,6 +109,76 @@ export function useRecurring({ userId = null } = {}) {
 
   useEffect(() => { load() }, [load])
 
+  // ── Rule management ────────────────────────────────────────────────────
+  // Only the columns a rule owns. Anything derived — occurrences, status,
+  // what has been paid — stays derived.
+  const RULE_COLUMNS = [
+    'name', 'amount', 'type', 'frequency', 'anchor_date', 'ends_on',
+    'account_id', 'category_id', 'person', 'is_variable', 'is_active',
+  ]
+  const ruleColumns = (values) => Object.fromEntries(
+    Object.entries(values).filter(([k]) => RULE_COLUMNS.includes(k)))
+
+  async function createObligation(values) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data, error } = await supabase
+      .from('scheduled_payments')
+      .insert([{ ...ruleColumns(values), user_id: session?.user?.id }])
+      .select('id').single()
+    if (error) throw error
+    await load()
+    return data?.id
+  }
+
+  async function updateObligation(id, values) {
+    const { error } = await supabase
+      .from('scheduled_payments').update(ruleColumns(values)).eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  // Deleting a rule leaves its transactions alone — the foreign key is
+  // ON DELETE SET NULL, so history survives with the link cleared.
+  async function deleteObligation(id) {
+    const { error } = await supabase.from('scheduled_payments').delete().eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  // Pausing stops projection from today forward without touching history.
+  async function setObligationActive(id, is_active) {
+    const { error } = await supabase
+      .from('scheduled_payments').update({ is_active }).eq('id', id)
+    if (error) throw error
+    await load()
+  }
+
+  // Turns an inferred series into a real rule and links its transactions —
+  // the per-item equivalent of the backfill script, sharing its derivation.
+  async function adoptSeries(item) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const rule = ruleFromObligation(toObligation(item))
+    const { data, error } = await supabase
+      .from('scheduled_payments')
+      .insert([{
+        ...ruleColumns(rule),
+        account_id:  item.account_id ?? null,
+        category_id: item.category_id ?? null,
+        user_id:     item.user_id || session?.user?.id,
+      }])
+      .select('id').single()
+    if (error) throw error
+
+    const ids = (item._txns || []).map(t => t.id)
+    if (ids.length) {
+      const { error: linkError } = await supabase
+        .from('transactions').update({ obligation_id: data.id }).in('id', ids)
+      if (linkError) throw linkError
+    }
+    await load()
+    return data.id
+  }
+
   // Takes a grouped item and unflags every transaction in the series. Clearing
   // only the group's representative would leave the rest flagged, and the series
   // would simply reappear behind an older transaction.
@@ -119,5 +190,10 @@ export function useRecurring({ userId = null } = {}) {
     await load()
   }
 
-  return { items, occurrences, loading, removeRecurring, refresh: load }
+  return {
+    items, occurrences, loading, refresh: load,
+    removeRecurring,
+    createObligation, updateObligation, deleteObligation, setObligationActive,
+    adoptSeries,
+  }
 }

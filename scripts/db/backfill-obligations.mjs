@@ -22,7 +22,7 @@
  */
 import pg from 'pg'
 import {
-  groupRecurring, toObligation, buildSchedule, startOfDay,
+  groupRecurring, toObligation, ruleFromObligation, startOfDay,
 } from '../../frontend/src/lib/paymentSchedule.js'
 
 const APPLY = process.argv.includes('--apply')
@@ -33,72 +33,15 @@ if (!DB) {
   process.exit(1)
 }
 
-// scheduled_payments.frequency is a word; the projection works in days.
-const FREQUENCY_WORD = {
-  7: 'weekly', 14: 'biweekly', 15: 'semimonthly',
-  30: 'monthly', 91: 'quarterly', 365: 'yearly',
-}
-
-// Amounts this far from the median mean the bill is genuinely variable (hydro,
-// phone) rather than a fixed commitment. A declared amount on a variable bill
-// would otherwise read as Partially paid every month it lands low.
-const VARIABLE_SPREAD = 0.10
-// A series with nothing for this many cycles is treated as ended, so cancelled
-// subscriptions don't come back as active obligations projecting forward.
-const STALE_CYCLES = 2
-
 const money = n => '$' + Math.abs(n).toLocaleString('en-CA', { minimumFractionDigits: 2 })
-const iso   = d => d.toISOString().slice(0, 10)
-const median = (nums) => {
-  const s = [...nums].sort((a, b) => a - b)
-  return s[Math.floor(s.length / 2)]
-}
 
-// What the rule should say, derived from the transactions that imply it.
+// The lib decides what a series is worth, when it started, whether it has ended
+// and whether its amount is an estimate — the same code the adopt action in the
+// UI uses, so a rule created either way comes out identical.
 function describe(item, today) {
-  const obligation = toObligation(item)
-  const dates   = obligation.payments.map(p => p.date).sort((a, b) => a - b)
-  const amounts = obligation.payments.map(p => Math.abs(p.amount))
-  const freqDays = obligation.freqDays
-  const newest   = item   // groupRecurring keeps the newest row's fields on the group
-
-  // Reuse the projection's own idea of what a cycle is worth, so the declared
-  // amount matches the figure the Dashboard has been showing all along.
-  const scheduled = buildSchedule([obligation], { today })[0]?.scheduled
-                 ?? median(amounts)
-
-  // anchor_date is the first due date and never moves. Projection steps from it
-  // by calendar month, preserving day-of-month, so anchoring on the earliest
-  // observed payment reproduces the existing grid.
-  const anchor = dates[0]
-
-  const mid    = median(amounts)
-  const spread = mid > 0 ? Math.max(...amounts.map(a => Math.abs(a - mid) / mid)) : 0
-  const isVariable = spread > VARIABLE_SPREAD
-
-  const last       = dates[dates.length - 1]
-  const staleAfter = new Date(last); staleAfter.setDate(staleAfter.getDate() + freqDays * STALE_CYCLES)
-  const isActive   = staleAfter >= today
-
-  return {
-    key:         item._key,
-    user_id:     newest.user_id,
-    account_id:  newest.account_id ?? null,
-    category_id: newest.category_id ?? null,
-    name:        newest.description,
-    amount:      Number(scheduled.toFixed(2)),
-    type:        newest.amount > 0 ? 'income' : 'expense',
-    frequency:   FREQUENCY_WORD[freqDays] ?? 'monthly',
-    anchor_date: iso(anchor),
-    ends_on:     isActive ? null : iso(last),
-    person:      newest.person ?? null,
-    is_variable: isVariable,
-    is_active:   isActive,
-    _txnIds:     obligation.payments.map(p => p.id),
-    _count:      obligation.payments.length,
-    _freqLabel:  obligation.freqLabel,
-    _lastSeen:   iso(last),
-  }
+  const ob = toObligation(item)
+  return { key: item._key, account_id: item.account_id ?? null,
+           category_id: item.category_id ?? null, ...ruleFromObligation(ob, { today }) }
 }
 
 async function main() {
@@ -168,7 +111,7 @@ async function main() {
     const variable = planned.filter(p => p.is_variable).length
     const inactive = planned.filter(p => !p.is_active).length
     console.log('─'.repeat(96))
-    console.log(`~ = variable amount (${variable})   ·   ended = no payment in ${STALE_CYCLES} cycles (${inactive})`)
+    console.log(`~ = variable amount (${variable})   ·   ended = no recent payment (${inactive})`)
 
     if (!APPLY) {
       console.log('\nDry run — nothing was written. Re-run with --apply to commit.')

@@ -48,6 +48,8 @@
     }
   },
   "newTx": {
+    "countsToward": "Counts toward", "countsNone": "\u2014 Not a recurring payment \u2014",
+    "countsHint": "Links this transaction to an obligation so it settles that period.",
     "title": "New transaction",
     "type": "Type", "expense": "Expense", "income": "Income", "transfer": "Transfer",
     "date": "Date", "amount": "Amount", "description": "Description",
@@ -152,6 +154,38 @@
     "received": "Received", "notReceived": "Not received",
     "upcoming": "Upcoming",
     "due": "Due", "left": "left"
+  },
+  "obligation": {
+    "title": "New obligation", "editTitle": "Edit obligation",
+    "name": "Name", "namePlaceholder": "e.g. Mortgage, Internet",
+    "type": "Type", "expense": "Payment", "income": "Income",
+    "amount": "Amount", "frequency": "Frequency",
+    "anchor": "First due date",
+    "anchorHint": "Every due date is projected from this one.",
+    "account": "Account", "accountNone": "\u2014 No account \u2014",
+    "category": "Category", "categoryNone": "\u2014 No category \u2014",
+    "person": "Responsible", "shared": "Shared",
+    "endsOn": "Ends on", "endsHint": "Leave empty if it has no end date.",
+    "variable": "Amount varies",
+    "variableHint": "For bills like hydro. Any payment in the cycle settles it, so a low month is not reported as a shortfall.",
+    "active": "Active",
+    "activeHint": "Paused obligations keep their history but stop appearing as upcoming.",
+    "cancel": "Cancel", "save": "Create obligation", "saveEdit": "Save changes",
+    "saving": "Saving\u2026", "delete": "Delete", "confirmDelete": "Confirm delete",
+    "errName": "Give the obligation a name.",
+    "errAmount": "Enter an amount greater than zero.",
+    "errAnchor": "Pick the first due date.",
+    "errEnds": "The end date cannot be before the first due date.",
+    "freq": {
+      "weekly": "Weekly", "biweekly": "Biweekly", "semimonthly": "Semi-monthly",
+      "monthly": "Monthly", "quarterly": "Quarterly", "yearly": "Annual"
+    },
+    "adopt": "Make it an obligation", "detected": "Detected", "adoptHint": "Detected from your transactions",
+    "pause": "Pause", "resume": "Resume", "paused": "Paused", "declared": "Obligation",
+    "addBtn": "Add obligation",
+    "emptyTitle": "No obligations yet",
+    "emptySub": "Declare the bills you expect \u2014 rent, subscriptions, loan payments. An obligation can exist before it has ever been paid.",
+    "emptyCta": "Add your first obligation"
   },
   "review": {
     "title": "Review",

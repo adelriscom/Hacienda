@@ -47,6 +47,8 @@
     }
   },
   "newTx": {
+    "countsToward": "Rattach\u00e9 \u00e0", "countsNone": "\u2014 Pas un paiement r\u00e9current \u2014",
+    "countsHint": "Rattache cette transaction \u00e0 une obligation pour r\u00e9gler cette p\u00e9riode.",
     "title": "Nouvelle transaction",
     "type": "Type", "expense": "Dépense", "income": "Revenu", "transfer": "Virement",
     "date": "Date", "amount": "Montant", "description": "Description",
@@ -151,6 +153,38 @@
     "received": "Reçu", "notReceived": "Non reçu",
     "upcoming": "À venir",
     "due": "Échéance", "left": "restant"
+  },
+  "obligation": {
+    "title": "Nouvelle obligation", "editTitle": "Modifier l\u2019obligation",
+    "name": "Nom", "namePlaceholder": "p. ex. Hypoth\u00e8que, Internet",
+    "type": "Type", "expense": "Paiement", "income": "Revenu",
+    "amount": "Montant", "frequency": "Fr\u00e9quence",
+    "anchor": "Premi\u00e8re \u00e9ch\u00e9ance",
+    "anchorHint": "Toutes les \u00e9ch\u00e9ances sont projet\u00e9es \u00e0 partir de cette date.",
+    "account": "Compte", "accountNone": "\u2014 Aucun compte \u2014",
+    "category": "Cat\u00e9gorie", "categoryNone": "\u2014 Aucune cat\u00e9gorie \u2014",
+    "person": "Responsable", "shared": "Partag\u00e9",
+    "endsOn": "Se termine le", "endsHint": "Laissez vide s\u2019il n\u2019y a pas de fin.",
+    "variable": "Montant variable",
+    "variableHint": "Pour des factures comme l\u2019\u00e9lectricit\u00e9. Tout paiement du cycle la r\u00e8gle, donc un mois bas n\u2019est pas signal\u00e9 comme un manque.",
+    "active": "Active",
+    "activeHint": "Une obligation en pause garde son historique mais n\u2019appara\u00eet plus comme \u00e0 venir.",
+    "cancel": "Annuler", "save": "Cr\u00e9er l\u2019obligation", "saveEdit": "Enregistrer",
+    "saving": "Enregistrement\u2026", "delete": "Supprimer", "confirmDelete": "Confirmer",
+    "errName": "Donnez un nom \u00e0 l\u2019obligation.",
+    "errAmount": "Saisissez un montant sup\u00e9rieur \u00e0 z\u00e9ro.",
+    "errAnchor": "Choisissez la premi\u00e8re \u00e9ch\u00e9ance.",
+    "errEnds": "La date de fin ne peut pr\u00e9c\u00e9der la premi\u00e8re \u00e9ch\u00e9ance.",
+    "freq": {
+      "weekly": "Hebdomadaire", "biweekly": "Aux deux semaines", "semimonthly": "Bimensuel",
+      "monthly": "Mensuel", "quarterly": "Trimestriel", "yearly": "Annuel"
+    },
+    "adopt": "En faire une obligation", "detected": "Détecté", "adoptHint": "D\u00e9tect\u00e9 dans vos transactions",
+    "pause": "Mettre en pause", "resume": "Reprendre", "paused": "En pause", "declared": "Obligation",
+    "addBtn": "Ajouter une obligation",
+    "emptyTitle": "Aucune obligation pour l\u2019instant",
+    "emptySub": "D\u00e9clarez les paiements attendus \u2014 loyer, abonnements, mensualit\u00e9s. Une obligation peut exister avant d\u2019avoir \u00e9t\u00e9 pay\u00e9e.",
+    "emptyCta": "Ajouter la premi\u00e8re"
   },
   "review": {
     "title": "À réviser",

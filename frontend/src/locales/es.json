@@ -47,6 +47,8 @@
     }
   },
   "newTx": {
+    "countsToward": "Corresponde a", "countsNone": "\u2014 No es un pago recurrente \u2014",
+    "countsHint": "Vincula esta transacci\u00f3n a una obligaci\u00f3n para saldar ese per\u00edodo.",
     "title": "Nuevo movimiento",
     "type": "Tipo", "expense": "Gasto", "income": "Ingreso", "transfer": "Transferencia",
     "date": "Fecha", "amount": "Monto", "description": "Descripción",
@@ -151,6 +153,38 @@
     "received": "Recibido", "notReceived": "No recibido",
     "upcoming": "Próximo",
     "due": "Vence", "left": "restante"
+  },
+  "obligation": {
+    "title": "Nueva obligaci\u00f3n", "editTitle": "Editar obligaci\u00f3n",
+    "name": "Nombre", "namePlaceholder": "p. ej. Hipoteca, Internet",
+    "type": "Tipo", "expense": "Pago", "income": "Ingreso",
+    "amount": "Monto", "frequency": "Frecuencia",
+    "anchor": "Primer vencimiento",
+    "anchorHint": "Todos los vencimientos se proyectan desde esta fecha.",
+    "account": "Cuenta", "accountNone": "\u2014 Sin cuenta \u2014",
+    "category": "Categor\u00eda", "categoryNone": "\u2014 Sin categor\u00eda \u2014",
+    "person": "Responsable", "shared": "Compartido",
+    "endsOn": "Termina el", "endsHint": "D\u00e9jalo vac\u00edo si no tiene fecha de fin.",
+    "variable": "El monto var\u00eda",
+    "variableHint": "Para servicios como la luz. Cualquier pago del ciclo la salda, as\u00ed un mes bajo no se reporta como faltante.",
+    "active": "Activa",
+    "activeHint": "Las obligaciones pausadas conservan su historial pero dejan de aparecer como pr\u00f3ximas.",
+    "cancel": "Cancelar", "save": "Crear obligaci\u00f3n", "saveEdit": "Guardar cambios",
+    "saving": "Guardando\u2026", "delete": "Eliminar", "confirmDelete": "Confirmar",
+    "errName": "Ponle un nombre a la obligaci\u00f3n.",
+    "errAmount": "Ingresa un monto mayor que cero.",
+    "errAnchor": "Elige el primer vencimiento.",
+    "errEnds": "La fecha de fin no puede ser anterior al primer vencimiento.",
+    "freq": {
+      "weekly": "Semanal", "biweekly": "Quincenal", "semimonthly": "Bimensual",
+      "monthly": "Mensual", "quarterly": "Trimestral", "yearly": "Anual"
+    },
+    "adopt": "Convertir en obligaci\u00f3n", "detected": "Detectado", "adoptHint": "Detectado de tus transacciones",
+    "pause": "Pausar", "resume": "Reanudar", "paused": "Pausada", "declared": "Obligaci\u00f3n",
+    "addBtn": "Agregar obligaci\u00f3n",
+    "emptyTitle": "A\u00fan no hay obligaciones",
+    "emptySub": "Declara los pagos que esperas \u2014 arriendo, suscripciones, cuotas. Una obligaci\u00f3n puede existir antes de pagarse por primera vez.",
+    "emptyCta": "Agregar la primera"
   },
   "review": {
     "title": "Por revisar",

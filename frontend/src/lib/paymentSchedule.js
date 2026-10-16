@@ -282,6 +282,59 @@ export function obligationFromRule(rule, linked = []) {
   }
 }
 
+// How much an inferred series varies around its own median before its amount is
+// better described as an estimate than a commitment.
+const VARIABLE_SPREAD = 0.10
+// A series silent for this many cycles has ended, so a cancelled subscription
+// doesn't come back as an active obligation projecting forward.
+const STALE_CYCLES = 2
+
+const DAYS_FREQUENCY = {
+  7: 'weekly', 14: 'biweekly', 15: 'semimonthly',
+  30: 'monthly', 91: 'quarterly', 365: 'yearly',
+}
+
+// Describes an inferred series as the scheduled_payments row that would replace
+// it. Shared by the one-off backfill script and the adopt action in the UI, so
+// the two can never disagree about what a series is worth or when it started.
+export function ruleFromObligation(ob, { today = new Date() } = {}) {
+  const t0      = startOfDay(today)
+  const dates   = ob.payments.map(p => p.date).sort((a, b) => a - b)
+  const amounts = ob.payments.map(p => Math.abs(p.amount))
+  const freq    = ob.freqDays || 30
+
+  // Reuse the projection's own idea of a cycle's worth, so the declared amount
+  // matches the figure the screens have been showing all along.
+  const scheduled = buildSchedule([ob], { today: t0 })[0]?.scheduled ?? median(amounts)
+
+  const mid    = median(amounts)
+  const spread = mid > 0 ? Math.max(...amounts.map(a => Math.abs(a - mid) / mid)) : 0
+
+  const last  = dates[dates.length - 1]
+  const stale = startOfDay(last); stale.setDate(stale.getDate() + freq * STALE_CYCLES)
+  const active = stale >= t0
+
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  return {
+    user_id:     ob.ownerUserId,
+    name:        ob.description,
+    amount:      Number(Math.abs(scheduled).toFixed(2)),
+    type:        ob.isIncome ? 'income' : 'expense',
+    frequency:   DAYS_FREQUENCY[freq] ?? 'monthly',
+    anchor_date: ymd(dates[0]),
+    ends_on:     active ? null : ymd(last),
+    person:      ob.person ?? null,
+    is_variable: spread > VARIABLE_SPREAD,
+    is_active:   active,
+    // Not columns — what the caller needs to finish the job.
+    _txnIds:     ob.payments.map(p => p.id),
+    _freqLabel:  ob.freqLabel,
+    _lastSeen:   ymd(last),
+    _count:      ob.payments.length,
+  }
+}
+
 // Projects every obligation across [monthsBack, monthsAhead] around `today` and
 // settles each occurrence from its real transactions.
 export function buildSchedule(obligations, { today = new Date(), monthsBack = 3, monthsAhead = 2 } = {}) {
