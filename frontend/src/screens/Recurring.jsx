@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import NewTransactionModal from '../components/NewTransactionModal'
+import ObligationModal from '../components/ObligationModal'
 import { useRecurring } from '../hooks/useRecurring'
 import { useTransactions } from '../hooks/useTransactions'
 import { useHousehold } from '../lib/household'
@@ -11,7 +12,8 @@ import { STATUS } from '../lib/paymentSchedule'
 // The occurrence carries two independent facts — how much has been paid, and
 // where the due date sits — so the row reports payment progress first and falls
 // back to the date only when nothing is owed yet.
-function statusOf(occ, isIncome, t) {
+function statusOf(occ, isIncome, t, paused = false) {
+  if (paused) return { text: t('obligation.paused'), tone: 'var(--ink-3)' }
   if (!occ) return { text: '—', tone: 'var(--ink-3)' }
   const d = occ.daysFromDue
   switch (occ.status) {
@@ -38,14 +40,21 @@ export default function Recurring() {
   const { isFamily, myUserId } = useHousehold()
   // Scoped to the selected profile, the same way Transactions, Expenses,
   // Calendar and the Dashboard already are.
-  const { items, loading, removeRecurring, refresh } = useRecurring({
-    userId: isFamily ? null : myUserId,
-  })
-  const { addTransaction, updateTransaction, deleteTransaction } = useTransactions()
+  const {
+    items, loading, refresh, removeRecurring,
+    createObligation, updateObligation, deleteObligation, setObligationActive,
+    adoptSeries, adoptAll,
+  } = useRecurring({ userId: isFamily ? null : myUserId })
+  const { updateTransaction, deleteTransaction } = useTransactions()
   const { t } = useTranslation()
   const [showNew,     setShowNew]     = useState(false)
+  const [editingRule, setEditingRule] = useState(null)
   const [editingItem, setEditingItem] = useState(null)
+  const [busy,        setBusy]        = useState(null)
 
+  // Anything still inferred has no identity of its own — that is defect 6, and
+  // adopting it is what closes it.
+  const pending = items.filter(i => !i._declared)
   const incomeItems  = items.filter(i => i.amount > 0)
   const expenseItems = items.filter(i => i.amount < 0)
 
@@ -53,10 +62,20 @@ export default function Recurring() {
   const monthlyExpenses = expenseItems.reduce((s, i) => s + Math.abs(i.amount), 0)
   const net = monthlyIncome - monthlyExpenses
 
-  async function handleAdd(values) {
-    await addTransaction({ ...values, is_recurring: true })
-    await refresh()
-    setShowNew(false)
+  // Acting on a row is a round trip, so the row says so rather than going quiet.
+  async function run(key, fn) {
+    setBusy(key)
+    try { await fn() } finally { setBusy(null) }
+  }
+
+  const rowActions = {
+    busy,
+    editRule:   item => setEditingRule(item._rule),
+    editTxn:    item => setEditingItem(item),
+    remove:     item => run(item._key, () => removeRecurring(item)),
+    destroy:    item => run(item._key, () => deleteObligation(item.id)),
+    adopt:      item => run(item._key, () => adoptSeries(item)),
+    toggle:     item => run(item._key, () => setObligationActive(item.id, item._rule.is_active === false)),
   }
 
   return (
@@ -64,9 +83,31 @@ export default function Recurring() {
       <Topbar greet={t('recurring.title')}
         date={t('recurring.subtitle', { income: incomeItems.length, expenses: expenseItems.length })}>
         <button className="btn primary sm" onClick={() => setShowNew(true)}>
-          <Icon name="plus" size={12} /> Add recurring
+          <Icon name="plus" size={12} /> {t('obligation.addBtn')}
         </button>
       </Topbar>
+
+      {/* What is left to converge, and a way to do it in one go. */}
+      {!loading && pending.length > 0 && (
+        <div className="card" style={{
+          marginBottom: 16, padding: '14px 18px', display: 'flex',
+          alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          borderLeft: '3px solid var(--warn)',
+        }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)' }}>
+              {t('obligation.pendingTitle', { count: pending.length })}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 3, maxWidth: 560 }}>
+              {t('obligation.pendingBody')}
+            </div>
+          </div>
+          <button className="btn primary sm" disabled={busy === '__all__'}
+            onClick={() => run('__all__', () => adoptAll(pending))}>
+            {busy === '__all__' ? t('obligation.saving') : t('obligation.adoptAll')}
+          </button>
+        </div>
+      )}
 
       {/* KPI summary */}
       {!loading && items.length > 0 && (
@@ -85,26 +126,39 @@ export default function Recurring() {
       ) : items.length === 0 ? (
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--ink-3)' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>🔁</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 6 }}>No recurring transactions yet</div>
-          <div style={{ fontSize: 13, marginBottom: 20 }}>Track subscriptions, rent, salary and any fixed transactions.</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 6 }}>
+            {t('obligation.emptyTitle')}
+          </div>
+          <div style={{ fontSize: 13, marginBottom: 20, maxWidth: 420, marginInline: 'auto' }}>
+            {t('obligation.emptySub')}
+          </div>
           <button className="btn primary" onClick={() => setShowNew(true)}>
-            <Icon name="plus" size={14} /> Add your first recurring
+            <Icon name="plus" size={14} /> {t('obligation.emptyCta')}
           </button>
         </div>
       ) : (
-        <div className="grid-2">
-          <Section title={t('recurring.incomeSection')}  items={incomeItems}  onRemove={removeRecurring} onEdit={setEditingItem} t={t} />
-          <Section title={t('recurring.expenseSection')} items={expenseItems} onRemove={removeRecurring} onEdit={setEditingItem} t={t} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Section title={t('recurring.expenseSection')} items={expenseItems} actions={rowActions} t={t} />
+          <Section title={t('recurring.incomeSection')}  items={incomeItems}  actions={rowActions} t={t} />
         </div>
       )}
 
       {showNew && (
-        <NewTransactionModal
+        <ObligationModal
           onClose={() => setShowNew(false)}
-          onSave={handleAdd}
-          defaults={{ is_recurring: true }}
+          onSave={createObligation}
         />
       )}
+      {editingRule && (
+        <ObligationModal
+          rule={editingRule}
+          onClose={() => setEditingRule(null)}
+          onSave={values => updateObligation(editingRule.id, values)}
+          onDelete={deleteObligation}
+        />
+      )}
+      {/* A leftover inferred series is still a transaction, so it keeps the
+          transaction editor until it is adopted. */}
       {editingItem && (
         <NewTransactionModal
           transaction={editingItem}
@@ -117,7 +171,7 @@ export default function Recurring() {
   )
 }
 
-function Section({ title, items, onRemove, onEdit, t }) {
+function Section({ title, items, actions, t }) {
   if (items.length === 0) return null
   return (
     <div className="card">
@@ -128,19 +182,24 @@ function Section({ title, items, onRemove, onEdit, t }) {
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {items.map(item => <RecurringRow key={item.id} item={item} onRemove={onRemove} onEdit={onEdit} t={t} />)}
+        {items.map(item => <RecurringRow key={item._key} item={item} actions={actions} t={t} />)}
       </div>
     </div>
   )
 }
 
-function RecurringRow({ item, onRemove, onEdit, t }) {
+function RecurringRow({ item, actions, t }) {
   const [confirming, setConfirming] = useState(false)
   const color = item.category?.color || 'var(--accent)'
   const isIncome = item.amount > 0
+  // A declared rule is the real obligation; an inferred series is a leftover
+  // waiting to be adopted, and only supports what it always did.
+  const declared = item._declared === true
+  const paused   = declared && item._rule?.is_active === false
+  const working  = actions.busy === item._key
 
   const occ    = item._occurrence
-  const status = statusOf(occ, isIncome, t)
+  const status = statusOf(occ, isIncome, t, paused)
   // A partly paid obligation past its due date is both things at once.
   const alsoOverdue = occ?.status === STATUS.PARTIAL && occ.isOverdue
 
@@ -163,7 +222,7 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span className="rec-name" style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200 }}>
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {item.description}
           </span>
           {item._count > 1 && (
@@ -172,6 +231,22 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
               background: 'var(--bg-2)', color: 'var(--ink-3)',
             }}>
               {item._count}×
+            </span>
+          )}
+          {paused && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+              background: 'var(--bg-3)', color: 'var(--ink-2)',
+            }}>
+              {t('obligation.paused')}
+            </span>
+          )}
+          {!declared && (
+            <span title={t('obligation.adoptHint')} style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 5px', borderRadius: 4,
+              background: 'var(--warn-soft)', color: 'var(--warn)', whiteSpace: 'nowrap',
+            }}>
+              {t('obligation.detected')}
             </span>
           )}
         </div>
@@ -192,7 +267,7 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
       </div>
 
       {/* Payment status, then the period it belongs to */}
-      <div className="rec-status" style={{ textAlign: 'right', flexShrink: 0, minWidth: 94 }}>
+      <div className="rec-status" style={{ textAlign: 'right', flexShrink: 0, minWidth: 84 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: status.tone }}>
           {status.text}
         </div>
@@ -216,21 +291,42 @@ function RecurringRow({ item, onRemove, onEdit, t }) {
         {isIncome ? '+' : '−'}{fmt(item.amount)}
       </div>
 
-      {/* Edit / Remove buttons */}
+      {/* Actions — a rule can be paused, edited and deleted; a leftover series
+          can only be adopted or unflagged. */}
       <div style={{ flexShrink: 0, display: 'flex', gap: 4 }}>
         {confirming ? (
           <>
             <button className="btn ghost sm" style={{ fontSize: 11, color: 'var(--neg)' }}
-              onClick={() => onRemove(item)}>
-              {t('recurring.confirm')}
+              disabled={working}
+              onClick={() => (declared ? actions.destroy(item) : actions.remove(item))}>
+              {declared ? t('obligation.confirmDelete') : t('recurring.confirm')}
             </button>
             <button className="btn ghost sm" style={{ fontSize: 11 }}
               onClick={() => setConfirming(false)}>✕</button>
           </>
+        ) : declared ? (
+          <>
+            <button className="icon-btn sm-btn" disabled={working}
+              title={paused ? t('obligation.resume') : t('obligation.pause')}
+              onClick={() => actions.toggle(item)}>
+              <Icon name={paused ? 'toggle-off' : 'toggle-on'} size={14} />
+            </button>
+            <button className="icon-btn sm-btn" title={t('obligation.editTitle')}
+              onClick={() => actions.editRule(item)}>
+              <Icon name="edit" size={13} />
+            </button>
+            <button className="icon-btn sm-btn" title={t('obligation.delete')}
+              onClick={() => setConfirming(true)}>
+              <Icon name="x" size={13} />
+            </button>
+          </>
         ) : (
           <>
-            <button className="icon-btn sm-btn" title="Edit" onClick={() => onEdit(item)}>
-              <Icon name="edit" size={13} />
+            <button className="icon-btn sm-btn" style={{ color: 'var(--accent)' }}
+              disabled={working} title={t('obligation.adopt')}
+              aria-label={t('obligation.adopt')}
+              onClick={() => actions.adopt(item)}>
+              <Icon name={working ? 'recurring' : 'check'} size={13} />
             </button>
             <button className="icon-btn sm-btn" title={t('recurring.remove')}
               onClick={() => setConfirming(true)}>

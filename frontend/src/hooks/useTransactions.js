@@ -9,7 +9,9 @@ function computeTag(t) {
   if (t.status === 'match')     return { kind: 'ok',       key: 'cleared' }
   if (t.type   === 'income')    return { kind: 'income',   key: 'income' }
   if (t.type   === 'transfer')  return { kind: 'transfer', key: 'transfer' }
-  if (t.is_recurring)           return { kind: 'ok',       key: 'recurring' }
+  // Linked to an obligation. `is_recurring` is the pre-018 spelling of the
+  // same thing and stays readable until migration 019 drops it.
+  if (t.obligation_id || t.is_recurring) return { kind: 'ok', key: 'recurring' }
   return { kind: 'pending', key: 'pending' }
 }
 

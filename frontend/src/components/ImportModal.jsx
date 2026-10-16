@@ -137,7 +137,6 @@ function parseSheet(ws, categories, accounts) {
         account_name:  '',
         person:        '',
         notes:         null,
-        is_recurring:  false,
         status:        'review',
       }))
   } else {
@@ -189,7 +188,6 @@ function parseSheet(ws, categories, accounts) {
           account_name:  get(r, 'cuenta'),
           person:        get(r, 'quien'),
           notes:         get(r, 'notas') || null,
-          is_recurring:  false,
           status:        'review',
         }
       })
@@ -298,7 +296,6 @@ export default function ImportModal({ onClose, onSave }) {
           account_name:      acctName,
           person:            '',
           notes:             null,
-          is_recurring:      false,
           status:            'review',
           _cat_warn:         false,
           _acct_new:         !!acctName && !matchedAcct,

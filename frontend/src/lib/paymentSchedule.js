@@ -47,6 +47,16 @@ const HISTORY_WINDOW = 6
 // (weekly, biweekly, semi-monthly) step by days.
 const MONTH_STEP = { 30: 1, 91: 3, 365: 12 }
 
+// A bare YYYY-MM-DD parses as UTC, so in any negative offset startOfDay() would
+// pull it back to the previous day and shift every due date by one. Date-only
+// columns (anchor_date, ends_on) are calendar dates, not instants.
+export function parseDateOnly(value) {
+  if (value instanceof Date) return startOfDay(value)
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value))
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return startOfDay(new Date(value))
+}
+
 export function startOfDay(d) {
   const x = new Date(d)
   return new Date(x.getFullYear(), x.getMonth(), x.getDate())
@@ -119,12 +129,17 @@ function occurrenceDatesIn(anchor, freqDays, from, to) {
 // Status comes from money actually received against the occurrence, never from
 // the due date alone. A partially paid occurrence past its due date reports
 // both: status 'partial' plus isOverdue.
-export function resolveStatus({ scheduled, paid, dueDate, today }) {
+export function resolveStatus({ scheduled, paid, dueDate, today, isVariable = false }) {
   const expected = Math.abs(scheduled)
   const got      = Math.abs(paid)
   const tol      = Math.max(0.01, expected * SETTLED_TOLERANCE)
   const overdue  = dueDate < today
 
+  // On a variable obligation the amount is only an estimate, so any payment in
+  // the cycle settles it. Measuring hydro against an estimate would report
+  // Partially paid every month the bill came in low.
+  if (isVariable && got > CENT)
+    return { status: STATUS.PAID, isOverdue: false, remaining: 0, progress: 1 }
   if (expected > CENT && got >= expected - tol)
     return { status: STATUS.PAID, isOverdue: false, remaining: 0, progress: 1 }
   if (got > CENT)
@@ -138,6 +153,66 @@ export function resolveStatus({ scheduled, paid, dueDate, today }) {
   if (+dueDate === +today)
     return { status: STATUS.DUE_TODAY, isOverdue: false, remaining: expected, progress: 0 }
   return { status: STATUS.UPCOMING, isOverdue: false, remaining: expected, progress: 0 }
+}
+
+// Frequencies a series can be detected as. Days are what the projection steps
+// by; the label is what the UI shows.
+const FREQUENCIES = [
+  { days: 7,   label: 'Weekly' },
+  { days: 14,  label: 'Biweekly' },
+  { days: 15,  label: 'Semi-monthly' },
+  { days: 30,  label: 'Monthly' },
+  { days: 91,  label: 'Quarterly' },
+  { days: 365, label: 'Annual' },
+]
+
+// scheduled_payments stores a word; the projection steps in days.
+const FREQUENCY_DAYS = {
+  weekly: 7, biweekly: 14, semimonthly: 15, monthly: 30, quarterly: 91, yearly: 365,
+}
+const FREQUENCY_LABEL = {
+  weekly: 'Weekly', biweekly: 'Biweekly', semimonthly: 'Semi-monthly',
+  monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Annual',
+}
+
+// Infers a cadence from observed dates: the median gap, snapped to the nearest
+// known frequency. A single observation can't show a gap, so it defaults monthly.
+export function detectFrequency(dates) {
+  if (dates.length < 2) return { days: 30, label: 'Monthly' }
+  const sorted = [...dates].map(d => new Date(d)).sort((a, b) => a - b)
+  const gaps = []
+  for (let i = 1; i < sorted.length; i++)
+    gaps.push((sorted[i] - sorted[i - 1]) / 86400000)
+  gaps.sort((a, b) => a - b)
+  const median = gaps[Math.floor(gaps.length / 2)]
+  return FREQUENCIES.reduce((best, f) =>
+    Math.abs(f.days - median) < Math.abs(best.days - median) ? f : best
+  )
+}
+
+// Collapses recurring transaction rows into one series each, keyed by owner as
+// well as description: two household members paying their own "Internet" are two
+// obligations, not one merged row. Exported so the notification bell builds the
+// same series the screens do.
+export function groupRecurring(rows) {
+  const groups = new Map()
+  ;(rows || []).forEach(t => {
+    const key = `${t.user_id || ''}|${t.description.toLowerCase().trim()}`
+    const g   = groups.get(key)
+    if (g) {
+      g._dates.push(t.occurred_at)
+      g._txns.push(t)
+    } else {
+      groups.set(key, { ...t, _key: key, _dates: [t.occurred_at], _txns: [t] })
+    }
+  })
+
+  return [...groups.values()]
+    .map(item => ({ ...item, _count: item._dates.length, _freq: detectFrequency(item._dates) }))
+    .sort((a, b) => {
+      if ((a.amount > 0) !== (b.amount > 0)) return a.amount > 0 ? -1 : 1
+      return Math.abs(b.amount) - Math.abs(a.amount)
+    })
 }
 
 // Maps one grouped entry from useRecurring() — the newest transaction in the
@@ -168,6 +243,98 @@ export function toObligation(item) {
   }
 }
 
+// Builds an obligation from a declared scheduled_payments row plus whatever
+// transactions have been linked to it. Produces exactly the shape toObligation()
+// produces for an inferred series, so everything downstream — projection,
+// settlement, status, grouping, the UI — is unchanged and cannot tell them apart.
+//
+// The difference is what the rule knows for itself: its own anchor, its own
+// amount, when it ends, and whether that amount is an estimate. An inferred
+// series has to guess all four from its payment history.
+export function obligationFromRule(rule, linked = []) {
+  const isIncome = rule.type === 'income'
+  return {
+    id:            rule.id,
+    key:           `rule:${rule.id}`,
+    declared:      true,
+    description:   rule.name,
+    ownerUserId:   rule.user_id || null,
+    person:        rule.person || null,
+    accountName:   rule.account?.name || null,
+    currency:      rule.account?.currency || null,
+    categoryName:  rule.category?.name || null,
+    categoryColor: rule.category?.color || null,
+    freqDays:      FREQUENCY_DAYS[rule.frequency] ?? 30,
+    freqLabel:     FREQUENCY_LABEL[rule.frequency] ?? 'Monthly',
+    isIncome,
+    // The rule states these; nothing has to be inferred from history.
+    anchorDate:     rule.anchor_date ? parseDateOnly(rule.anchor_date) : null,
+    endsOn:         rule.ends_on     ? parseDateOnly(rule.ends_on)     : null,
+    isActive:       rule.is_active !== false,
+    isVariable:     rule.is_variable === true,
+    declaredAmount: Math.abs(Number(rule.amount)),
+    payments: linked.map(t => ({
+      id:           t.id,
+      date:         startOfDay(new Date(t.occurred_at)),
+      amount:       Number(t.amount),
+      exchangeRate: t.exchange_rate ? Number(t.exchange_rate) : null,
+    })),
+  }
+}
+
+// How much an inferred series varies around its own median before its amount is
+// better described as an estimate than a commitment.
+const VARIABLE_SPREAD = 0.10
+// A series silent for this many cycles has ended, so a cancelled subscription
+// doesn't come back as an active obligation projecting forward.
+const STALE_CYCLES = 2
+
+const DAYS_FREQUENCY = {
+  7: 'weekly', 14: 'biweekly', 15: 'semimonthly',
+  30: 'monthly', 91: 'quarterly', 365: 'yearly',
+}
+
+// Describes an inferred series as the scheduled_payments row that would replace
+// it. Shared by the one-off backfill script and the adopt action in the UI, so
+// the two can never disagree about what a series is worth or when it started.
+export function ruleFromObligation(ob, { today = new Date() } = {}) {
+  const t0      = startOfDay(today)
+  const dates   = ob.payments.map(p => p.date).sort((a, b) => a - b)
+  const amounts = ob.payments.map(p => Math.abs(p.amount))
+  const freq    = ob.freqDays || 30
+
+  // Reuse the projection's own idea of a cycle's worth, so the declared amount
+  // matches the figure the screens have been showing all along.
+  const scheduled = buildSchedule([ob], { today: t0 })[0]?.scheduled ?? median(amounts)
+
+  const mid    = median(amounts)
+  const spread = mid > 0 ? Math.max(...amounts.map(a => Math.abs(a - mid) / mid)) : 0
+
+  const last  = dates[dates.length - 1]
+  const stale = startOfDay(last); stale.setDate(stale.getDate() + freq * STALE_CYCLES)
+  const active = stale >= t0
+
+  const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  return {
+    user_id:     ob.ownerUserId,
+    name:        ob.description,
+    amount:      Number(Math.abs(scheduled).toFixed(2)),
+    type:        ob.isIncome ? 'income' : 'expense',
+    frequency:   DAYS_FREQUENCY[freq] ?? 'monthly',
+    anchor_date: ymd(dates[0]),
+    ends_on:     active ? null : ymd(last),
+    person:      ob.person ?? null,
+    is_variable: spread > VARIABLE_SPREAD,
+    is_active:   active,
+    // Not columns — what the caller needs to finish the job.
+    _txnIds:     ob.payments.map(p => p.id),
+    _freqLabel:  ob.freqLabel,
+    _lastSeen:   ymd(last),
+    _count:      ob.payments.length,
+  }
+}
+
 // Projects every obligation across [monthsBack, monthsAhead] around `today` and
 // settles each occurrence from its real transactions.
 export function buildSchedule(obligations, { today = new Date(), monthsBack = 3, monthsAhead = 2 } = {}) {
@@ -177,10 +344,17 @@ export function buildSchedule(obligations, { today = new Date(), monthsBack = 3,
   const out  = []
 
   obligations.forEach(ob => {
-    if (!ob.payments?.length) return
-    const freq   = ob.freqDays || 30
-    const half   = Math.max(1, Math.round(freq / 2))
-    const anchor = resolveAnchor(ob.payments.map(p => p.date), freq)
+    // An inferred series exists only through its transactions. A declared rule
+    // stands on its own — which is the whole point: a bill you have never paid
+    // can finally be scheduled.
+    if (!ob.declared && !ob.payments?.length) return
+    const freq = ob.freqDays || 30
+    const half = Math.max(1, Math.round(freq / 2))
+    // A declared anchor is stated, not guessed, so it never drifts when a
+    // payment lands late.
+    const anchor = ob.anchorDate
+      ? startOfDay(ob.anchorDate)
+      : resolveAnchor(ob.payments.map(p => p.date), freq)
 
     // Project a cycle past each edge so a bill paid early or late at the window
     // boundary still settles against its own occurrence instead of a neighbour's.
@@ -209,26 +383,47 @@ export function buildSchedule(obligations, { today = new Date(), monthsBack = 3,
       .filter(o => o.d < t0 && o.total > CENT)
       .slice(-HISTORY_WINDOW)
       .map(o => o.total)
-    const newest    = ob.payments.reduce((a, p) => (p.date > a.date ? p : a), ob.payments[0])
-    const scheduled = history.length ? median(history) : Math.abs(newest.amount)
+    const newest = ob.payments.length
+      ? ob.payments.reduce((a, p) => (p.date > a.date ? p : a), ob.payments[0])
+      : null
+    // A declared amount is what the obligation is worth. The median of recent
+    // settled occurrences is the inferred series' best guess at the same thing.
+    const scheduled = ob.declaredAmount != null
+      ? ob.declaredAmount
+      : (history.length ? median(history) : Math.abs(newest.amount))
 
-    // Nothing was owed before the obligation first appeared, so don't project
-    // backwards past it — allowing half a cycle in case that first payment was
-    // itself late.
-    const firstSeen = ob.payments.reduce((a, p) => (p.date < a ? p.date : a), ob.payments[0].date)
-    const earliest  = startOfDay(firstSeen); earliest.setDate(earliest.getDate() - half)
+    // Nothing was owed before the obligation began. A rule says when that was;
+    // an inferred series can only point at its first payment, so allow half a
+    // cycle there in case that payment was itself late.
+    const earliest = ob.anchorDate
+      ? startOfDay(ob.anchorDate)
+      : (() => {
+          const first = ob.payments.reduce((a, p) => (p.date < a ? p.date : a), ob.payments[0].date)
+          const d = startOfDay(first); d.setDate(d.getDate() - half)
+          return d
+        })()
+
+    // A paused rule stops projecting from today; an ended one stops at its last
+    // due date. Either way history stays visible — only the future is cut off.
+    const latest = ob.endsOn ? startOfDay(ob.endsOn)
+                 : ob.isActive === false ? t0
+                 : null
 
     dates.forEach((dueDate, i) => {
       if (dueDate < from || dueDate > to || dueDate < earliest) return
+      if (latest && dueDate > latest) return
       const payments = [...buckets[i]].sort((a, b) => a.date - b.date)
       const paid     = payments.reduce((s, p) => s + Math.abs(p.amount), 0)
+      // A variable bill that has been paid is worth what it actually cost, so
+      // past periods total accurately and only the future stays an estimate.
+      const worth = ob.isVariable && paid > CENT ? paid : scheduled
       out.push({
-        ...resolveStatus({ scheduled, paid, dueDate, today: t0 }),
+        ...resolveStatus({ scheduled: worth, paid, dueDate, today: t0, isVariable: ob.isVariable }),
         id: `${ob.key}@${ymOf(dueDate)}-${String(dueDate.getDate()).padStart(2, '0')}`,
         obligation: ob,
         periodYm:   ymOf(dueDate),
         dueDate,
-        scheduled,
+        scheduled: worth,
         paid,
         payments,
         // The date money actually moved, kept separate from the due date.

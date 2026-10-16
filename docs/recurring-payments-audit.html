@@ -363,7 +363,7 @@
       <span><b>Read</b> 14 source files, 17 migrations</span>
       <span><b>Date</b> 15 October 2026</span>
       <span><b>Schema changes</b> none</span>
-      <span><b>Status</b> 4 of 6 defects fixed</span>
+      <span><b>Status</b> all 6 defects fixed</span>
     </div>
   </div>
 </header>
@@ -397,9 +397,9 @@
         <span class="tile-s">Only a transaction row carries money, so obligations cannot be double-counted.</span>
       </div>
       <div class="tile warn">
-        <span class="tile-n">2</span>
+        <span class="tile-n">0</span>
         <span class="tile-l">Defects still open</span>
-        <span class="tile-s">Of six found, four are fixed. The two that remain are limits of the model itself, not coding errors.</span>
+        <span class="tile-s">All six are closed. The last two needed obligations to become records rather than a GROUP BY over transactions.</span>
       </div>
     </div>
   </section>
@@ -543,7 +543,7 @@
     <div class="sec-head">
       <span class="eyebrow">Findings</span>
       <h2>Defects, ranked by impact</h2>
-      <p>Ranking is the structure here: 1 and 2 affected daily use, 3 and 4 made modules disagree — all four are now fixed. 5 and 6 are limits of the model itself and need the obligations rethink below.</p>
+      <p>Ranking is the structure here: 1 and 2 affected daily use, 3 and 4 made modules disagree, and 5 and 6 were limits of the model itself. All six are closed.</p>
     </div>
     <div class="stack">
 
@@ -610,30 +610,31 @@
         <p class="defect-where">frontend/src/screens/Recurring.jsx · frontend/src/hooks/useNotifications.js</p>
       </div>
 
-      <div class="defect low">
+      <div class="defect fixed">
         <span class="rank">5</span>
         <div class="defect-head">
-          <h3>An obligation is invisible until its first payment</h3>
-          <span class="chip info">Structural</span>
+          <h3>An obligation was invisible until its first payment</h3>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          Because the series is inferred from transactions, a bill you have never paid cannot be
-          scheduled, and a cancelled subscription keeps projecting forward until it is unflagged.
-          This is a direct consequence of the backwards lifecycle, not a coding error.
+          Because a series was inferred from transactions, a bill you had never paid could not be
+          scheduled, and a cancelled subscription kept projecting forward until someone unflagged
+          it. An obligation is now a <code>scheduled_payments</code> row: it can be declared before
+          it is ever paid, paused, or given an end date.
         </p>
       </div>
 
-      <div class="defect low">
+      <div class="defect fixed">
         <span class="rank">6</span>
         <div class="defect-head">
-          <h3>The description is the series identity</h3>
-          <span class="chip info">Structural</span>
+          <h3>The description was the series identity</h3>
+          <span class="chip ok">Fixed</span>
         </div>
         <p class="defect-body">
-          Grouping keys on lowercased description plus owner. Renaming one transaction silently
-          splits a series in two; renaming two unrelated bills alike silently merges them. A variable
-          bill such as hydro also reads as Partially paid whenever it lands more than 2% below its
-          median.
+          Grouping keyed on lowercased description plus owner, so renaming one transaction split a
+          series in two and naming two unrelated bills alike merged them. A rule has an id;
+          transactions point at it, and a rename is just a rename. A variable bill is marked as such,
+          so hydro no longer reads as Partially paid whenever it lands below its median.
         </p>
       </div>
 
@@ -756,25 +757,27 @@
         </p>
       </div>
       <div class="rec">
-        <h4>Declare obligations</h4>
+        <h4>Declare obligations <span class="chip ok">Done</span></h4>
         <p>
-          <code>scheduled_payments</code> already has name, amount, frequency, next date and
-          <code>is_active</code>. Adopting it gives real rules, a pause switch, exact expected
-          amounts, and bills that can be scheduled before they are first paid.
+          <code>scheduled_payments</code> is now the obligation record — real rules, a pause switch,
+          declared amounts, and bills that can be scheduled before they are first paid. Migration
+          018 plus the five phases in the
+          <a href="https://claude.ai/code/artifact/44f5ed0a-1228-4ec5-9040-2b3bfa9b2e83">scope</a>.
         </p>
       </div>
       <div class="rec">
-        <h4>Record the application</h4>
+        <h4>Record the application <span class="chip warn">Partly</span></h4>
         <p>
-          A link from a transaction to the occurrence it settles turns “Paid” from an inference into
-          a fact, and makes partial payments explicit instead of implied by a shortfall.
+          A transaction now names the obligation it settles. Which <i>occurrence</i> it settles is
+          still matched by date, so paying two months at once in a single transaction still lands on
+          one period. A per-occurrence link would close that.
         </p>
       </div>
       <div class="rec">
-        <h4>Give a series a stable id</h4>
+        <h4>Give a series a stable id <span class="chip ok">Done</span></h4>
         <p>
-          Once rules exist, point transactions at the rule instead of matching on description.
-          Renaming a bill stops splitting its history.
+          <code>transactions.obligation_id</code> points at the rule, so a payment settles a period
+          by link rather than by description match. Renaming a bill no longer splits its history.
         </p>
       </div>
       <div class="rec">
@@ -793,7 +796,7 @@
       <h2>Outstanding issues</h2>
     </div>
     <ul class="tight prose">
-      <li>Defects 1 through 4 are fixed and covered by tests. Defects 5 and 6 remain: they are consequences of inferring obligations from transactions, and closing them means adopting real obligation records rather than patching the derivation.</li>
+      <li>All six defects are fixed and covered by tests. Migrations 018 and 019 have <b>not</b> been applied to the live project, and the backfill has not been run — that is deliberate, and the order is in the scope document.</li>
       <li>16 Playwright tests across <code>status-badge</code>, <code>transfer-pairs</code> and the <code>verify-*</code> specs fail. Four need a <code>PW_PASSWORD</code> that is blank in <code>.env.test</code>; the rest rely on stale fixtures. Confirmed identical on a clean baseline, so none are caused by this work.</li>
       <li>Member subtotals describe the whole period while the Outstanding filter hides settled rows. Intended, and the toggle sits directly above — but it is the one place a reader may need a second look.</li>
     </ul>

@@ -79,6 +79,15 @@ export const MEMBERS = [
   { id: 'hm-2', household_id: HOUSE, user_id: MARCELA, display_name: 'Marcela',   role: 'member' },
 ]
 
+// The accounts the fixture transactions already reference, so account pickers
+// have something to offer.
+export const ACCOUNTS = [
+  { id: 'acct-cad', user_id: ALEX,    name: 'Scotia Chequing', type: 'checking',
+    currency: 'CAD', balance: 0, is_active: true },
+  { id: 'acct-cop', user_id: MARCELA, name: 'Bancolombia',     type: 'checking',
+    currency: 'COP', balance: 0, is_active: true },
+]
+
 const RATES = [
   { currency_code: 'COP', rate_to_base: 0.00032, month: '2026-09-01' },
   { currency_code: 'COP', rate_to_base: 0.00033, month: '2026-10-01' },
@@ -104,6 +113,13 @@ const SESSION = {
   },
 }
 
+// Declared obligations served from scheduled_payments. Empty by default, so the
+// existing suites keep exercising the inferred path; a test that wants rules
+// passes them to openApp/openDashboard.
+export const NEW_RULE_ID = '99999999-9999-4999-8999-999999999999'
+let rulesFixture = []
+export function setRules(rules) { rulesFixture = rules || [] }
+
 // Serves the handful of tables these screens touch; everything else comes back
 // empty so no screen can crash on a missing stub. Writes are recorded rather
 // than applied — `writes` lets a test assert exactly what was sent.
@@ -123,10 +139,13 @@ export async function stubSupabase(page, viewMode, writes = []) {
 
     if (req.method() !== 'GET') {
       writes.push({ method: req.method(), table, query, body: req.postDataJSON?.() ?? null })
+      // An insert that asks for the row back (.select().single()) needs an
+      // object, not an empty list, or the client rejects the response.
+      const echo = { id: NEW_RULE_ID }
       return route.fulfill({
         status: 200,
         headers: { 'content-type': 'application/json' },
-        body: '[]',
+        body: JSON.stringify(single ? echo : [echo]),
       })
     }
 
@@ -137,10 +156,20 @@ export async function stubSupabase(page, viewMode, writes = []) {
         : MEMBERS
     } else if (table === 'households') {
       body = [{ id: HOUSE, name: 'Delrisco-Falla' }]
+    } else if (table === 'accounts') {
+      body = ACCOUNTS
+      const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
+      if (owner) body = body.filter(r => r.user_id === owner[1])
     } else if (table === 'exchange_rates') {
       body = RATES
+    } else if (table === 'scheduled_payments') {
+      body = rulesFixture
+      const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
+      if (owner) body = body.filter(r => r.user_id === owner[1])
     } else if (table === 'transactions') {
-      body = query.includes('is_recurring=eq.true') ? recurringRows() : []
+      // Matches both `is_recurring=eq.true` and the or(...) form the hook uses
+      // once declared obligations are in play.
+      body = query.includes('is_recurring') ? recurringRows() : []
       // The personal profile filters server-side; mirror that here.
       const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
       if (owner) body = body.filter(r => r.user_id === owner[1])
@@ -163,14 +192,15 @@ export async function stubSupabase(page, viewMode, writes = []) {
 }
 
 // Boots the app at `route` with the clock pinned and the stub installed.
-export async function openApp(page, route, viewMode = 'family', writes = []) {
+export async function openApp(page, route, viewMode = 'family', writes = [], rules = []) {
+  setRules(rules)
   await page.clock.setFixedTime(new Date(`${TODAY}T10:00:00`))
   await stubSupabase(page, viewMode, writes)
   await page.goto(route)
 }
 
-export async function openDashboard(page, viewMode = 'family') {
-  await openApp(page, '/', viewMode)
+export async function openDashboard(page, viewMode = 'family', rules = []) {
+  await openApp(page, '/', viewMode, [], rules)
   await page.waitForSelector('.pay-card', { timeout: 20000 })
   // HouseholdProvider resolves the household asynchronously, so the card renders
   // personal-scoped for an instant before Family mode settles. Wait for the
