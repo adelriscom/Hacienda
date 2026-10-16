@@ -312,6 +312,8 @@
       "investment": "Inversión",
       "cash": "Efectivo"
     },
+    "derivedFrom": "de {{count}} transacciones", "derivedHint": "Anclado en {{opening}}, más {{count}} transacciones",
+    "sinceAnchor": "desde el ancla",
     "modal": {
       "titleNew": "Nueva cuenta",
       "titleEdit": "Editar cuenta",
@@ -319,7 +321,7 @@
       "namePlaceholder": "Ej. RBC Chequing",
       "type": "Tipo de cuenta",
       "currency": "Moneda",
-      "balance": "Saldo actual",
+      "balanceHint": "— indica lo que tiene ahora; el ancla se ajusta", "balance": "Saldo actual",
       "creditLimit": "Límite de crédito",
       "interestRate": "Tasa de interés anual (% APR)",
       "interestRatePlaceholder": "Ej. 19.99",

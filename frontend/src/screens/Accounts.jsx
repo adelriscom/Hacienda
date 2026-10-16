@@ -4,6 +4,17 @@ import Icon from '../components/Icon'
 import Topbar from '../components/Topbar'
 import Modal from '../components/Modal'
 import { useAccounts } from '../hooks/useAccounts'
+import { driftFromStored } from '../lib/balances'
+
+// The sign goes before the currency symbol, not between it and the digits.
+const fmtMoney = (n, currency) => {
+  const v = Number(n) || 0
+  const sign = v < 0 ? '−' : ''
+  const abs = Math.abs(v)
+  return currency === 'COP'
+    ? `${sign}$ ${Math.round(abs).toLocaleString('es-CO')}`
+    : `${sign}$${abs.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 import { CURRENCIES } from '../lib/currency'
 
 const TYPE_ICON = {
@@ -23,7 +34,7 @@ const TYPE_COLOR = {
 }
 
 export default function Accounts() {
-  const { accounts, loading, addAccount, updateAccount, toggleActive } = useAccounts()
+  const { accounts, loading, addAccount, updateAccount, anchorBalance, toggleActive } = useAccounts()
   const { t } = useTranslation()
   const [editing, setEditing]         = useState(null)
   const [showInactive, setShowInactive] = useState(false)
@@ -36,8 +47,8 @@ export default function Accounts() {
   const activeAccounts = accounts.filter(a => a.is_active)
   const cadNet = activeAccounts.filter(a => a.currency === 'CAD').reduce((s, a) => s + (a.balance || 0), 0)
   const copNet = activeAccounts.filter(a => a.currency === 'COP').reduce((s, a) => s + (a.balance || 0), 0)
-  const fmtCAD = n => '$' + n.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const fmtCOP = n => '$ ' + Math.round(n).toLocaleString('es-CO')
+  const fmtCAD = n => fmtMoney(n, 'CAD')
+  const fmtCOP = n => fmtMoney(n, 'COP')
 
   const { cadInterestCost, cadInterestReturn, copInterestCost, copInterestReturn } = activeAccounts.reduce((acc, a) => {
     if (!a.interest_rate || a.interest_rate <= 0) return acc
@@ -143,8 +154,21 @@ export default function Accounts() {
           account={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSave={async (values) => {
-            if (editing === 'new') await addAccount(values)
-            else await updateAccount(editing.id, values)
+            const { balance, ...rest } = values
+            if (editing === 'new') {
+              // A new account's stated balance is its anchor: nothing has
+              // happened on it yet, so the two are the same number.
+              await addAccount({ ...rest, balance, opening_balance: balance })
+            } else {
+              await updateAccount(editing.id, rest)
+              // Writing `balance` directly would be overwritten by the next
+              // derivation. Stating it re-anchors instead, so the figure holds.
+              if (editing._derived && balance !== editing.balance) {
+                await anchorBalance(editing, balance)
+              } else if (!editing._derived) {
+                await updateAccount(editing.id, { balance })
+              }
+            }
             setEditing(null)
           }}
           t={t}
@@ -165,7 +189,7 @@ function AccountGroup({ currency, label, accounts, onEdit, onToggle, t }) {
       </div>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
         gap: 10,
       }}>
         {accounts.map(a => <AccountCard key={a.id} account={a} onEdit={onEdit} onToggle={onToggle} t={t} />)}
@@ -254,6 +278,36 @@ function AccountCard({ account: a, onEdit, onToggle, t }) {
             )
           }
           return null
+        })()}
+      </div>
+
+      {/* Balance, and where it came from */}
+      <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 96 }}>
+        <div className="num" style={{
+          fontSize: 15, fontWeight: 700,
+          color: (a.balance || 0) < 0 ? 'var(--neg)' : 'var(--ink-0)',
+        }}>
+          {fmtMoney(a.balance, a.currency)}
+        </div>
+        {a._derived && a._txnCount > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2 }}
+            title={t('acct.derivedHint', {
+              opening: fmtMoney(a._opening, a.currency),
+              count: a._txnCount,
+            })}>
+            {t('acct.derivedFrom', { count: a._txnCount })}
+          </div>
+        )}
+        {(() => {
+          // How far the balance has moved since it was last anchored — what a
+          // statement would be reconciled against.
+          const drift = driftFromStored(a)
+          if (!drift) return null
+          return (
+            <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>
+              {drift > 0 ? '+' : '−'}{fmtMoney(Math.abs(drift), a.currency)} {t('acct.sinceAnchor')}
+            </div>
+          )
         })()}
       </div>
 
@@ -349,7 +403,14 @@ function AccountModal({ account, onClose, onSave, t }) {
             </div>
 
             <div className="form-field">
-              <label>{t('acct.modal.balance')}</label>
+              <label>
+                {t('acct.modal.balance')}
+                {account?._derived && (
+                  <span style={{ fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 400, marginLeft: 6 }}>
+                    {t('acct.modal.balanceHint')}
+                  </span>
+                )}
+              </label>
               <input type="number" step="0.01" placeholder="0.00"
                 value={form.balance} onChange={e => set('balance', e.target.value)} />
             </div>

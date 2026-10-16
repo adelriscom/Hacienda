@@ -313,6 +313,8 @@
       "investment": "Investment",
       "cash": "Cash"
     },
+    "derivedFrom": "from {{count}} transactions", "derivedHint": "Anchored at {{opening}}, plus {{count}} transactions",
+    "sinceAnchor": "since anchor",
     "modal": {
       "titleNew": "New account",
       "titleEdit": "Edit account",
@@ -320,7 +322,7 @@
       "namePlaceholder": "e.g. RBC Chequing",
       "type": "Account type",
       "currency": "Currency",
-      "balance": "Current balance",
+      "balanceHint": "— states what it holds now; the anchor adjusts", "balance": "Current balance",
       "creditLimit": "Credit limit",
       "interestRate": "Annual Interest Rate (% APR)",
       "interestRatePlaceholder": "e.g. 19.99",
