@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useHousehold } from '../lib/household'
 import {
-  groupRecurring, toObligation, buildSchedule, currentOccurrences,
-  statusLabel, isOutstanding, STATUS,
+  groupRecurring, toObligation, obligationFromRule, buildSchedule,
+  currentOccurrences, statusLabel, isOutstanding, STATUS,
 } from '../lib/paymentSchedule'
 
 function nowMonth() {
@@ -97,19 +97,52 @@ export function useNotifications() {
       //    Same grouping and same schedule the screens use, so the bell can't
       //    disagree with the Dashboard about when a bill is due or whether it
       //    has already been paid.
-      let recurringQuery = supabase
+      let txQuery = supabase
         .from('transactions')
         .select('*, account:accounts(name, currency)')
-        .eq('is_recurring', true)
+        .or('is_recurring.eq.true,obligation_id.not.is.null')
         .neq('status', 'ghost').neq('status', 'duplicate')
         .order('occurred_at', { ascending: false })
-      if (!isFamily && myUserId) recurringQuery = recurringQuery.eq('user_id', myUserId)
-      const { data: recurringTxs } = await recurringQuery
+      if (!isFamily && myUserId) txQuery = txQuery.eq('user_id', myUserId)
 
-      if (recurringTxs?.length) {
-        const grouped = groupRecurring(recurringTxs)
-        const byKey   = new Map(grouped.map(g => [g._key, g]))
-        const current = currentOccurrences(buildSchedule(grouped.map(toObligation)))
+      let ruleQuery = supabase
+        .from('scheduled_payments')
+        .select('*, account:accounts(name, currency)')
+      if (!isFamily && myUserId) ruleQuery = ruleQuery.eq('user_id', myUserId)
+
+      let [txResult, { data: rules }] = await Promise.all([txQuery, ruleQuery])
+
+      // `is_recurring` is only how unadopted series are found; once migration
+      // 019 drops it the or(...) fails and the links are all that matter.
+      if (txResult.error) {
+        let linkedOnly = supabase
+          .from('transactions')
+          .select('*, account:accounts(name, currency)')
+          .not('obligation_id', 'is', null)
+          .neq('status', 'ghost').neq('status', 'duplicate')
+          .order('occurred_at', { ascending: false })
+        if (!isFamily && myUserId) linkedOnly = linkedOnly.eq('user_id', myUserId)
+        txResult = await linkedOnly
+      }
+      const recurringTxs = txResult.data || []
+
+      if (recurringTxs.length || rules?.length) {
+        // Same two producers the screens use, so a declared obligation raises a
+        // notification and an unadopted series still does too.
+        const linked = new Map()
+        recurringTxs.forEach(t => {
+          if (!t.obligation_id) return
+          const list = linked.get(t.obligation_id)
+          if (list) list.push(t); else linked.set(t.obligation_id, [t])
+        })
+        const declaredObs = (rules || []).map(r => obligationFromRule(r, linked.get(r.id) || []))
+        const grouped     = groupRecurring(recurringTxs.filter(t => !t.obligation_id && t.is_recurring))
+        const byKey       = new Map([
+          ...grouped.map(g => [g._key, g]),
+          ...(rules || []).map(r => [`rule:${r.id}`, { description: r.name }]),
+        ])
+        const current = currentOccurrences(
+          buildSchedule([...declaredObs, ...grouped.map(toObligation)]))
 
         for (const [key, occ] of current) {
           // A settled obligation is not a notification, however close its due

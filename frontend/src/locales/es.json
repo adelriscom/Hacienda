@@ -179,7 +179,10 @@
       "weekly": "Semanal", "biweekly": "Quincenal", "semimonthly": "Bimensual",
       "monthly": "Mensual", "quarterly": "Trimestral", "yearly": "Anual"
     },
-    "adopt": "Convertir en obligaci\u00f3n", "detected": "Detectado", "adoptHint": "Detectado de tus transacciones",
+    "adopt": "Convertir en obligaci\u00f3n", "detected": "Detectado", "pendingTitle": "{{count}} series detectadas en tus transacciones",
+    "pendingBody": "Siguen funcionando, pero no tienen identidad propia: renombrar una la parte en dos. Conviértelas en obligaciones y eso se acaba.",
+    "adoptAll": "Adoptar todas", "converged": "Todas las series son obligaciones declaradas.",
+    "adoptHint": "Detectado de tus transacciones",
     "pause": "Pausar", "resume": "Reanudar", "paused": "Pausada", "declared": "Obligaci\u00f3n",
     "addBtn": "Agregar obligaci\u00f3n",
     "emptyTitle": "A\u00fan no hay obligaciones",

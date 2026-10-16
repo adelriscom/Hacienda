@@ -256,16 +256,52 @@ test.describe('Obligations · linking a payment', () => {
     await expect.poll(() => writesTo(writes, 'transactions', 'POST').length).toBe(1)
     const [body] = writesTo(writes, 'transactions', 'POST')[0].body
     expect(body.obligation_id).toBe('rule-1')
-    // The legacy flag is kept in step for whatever still reads it.
-    expect(body.is_recurring).toBe(true)
+    // The link is the only record of recurrence — no second flag to drift.
+    expect(body).not.toHaveProperty('is_recurring')
   })
 
-  test('with no obligations declared the old flag is still offered', async ({ page }) => {
+  test('with nothing declared there is no recurring control at all', async ({ page }) => {
+    // A transaction is recurring because it points at an obligation. With none
+    // declared there is nothing to point at, so the form offers nothing —
+    // rather than a checkbox that sets a flag no longer read.
     await openApp(page, '/expenses', 'family', [], [])
     await page.getByRole('button', { name: /New transaction/i }).first().click()
 
     await expect(page.locator('#tx-obligation')).toHaveCount(0)
     await expect(page.locator('.modal-overlay').getByText('Recurring', { exact: true }))
-      .toBeVisible()
+      .toHaveCount(0)
+  })
+})
+
+test.describe('Obligations · converging', () => {
+  const banner = (page) => page.locator('.card').filter({ hasText: 'series detected from your transactions' })
+
+  test('the screen says how many series are still inferred', async ({ page }) => {
+    await openRecurring(page)
+    // The fixture household has six: Mortgage, Internet, Gym, Rent, Celular, Salary.
+    await expect(banner(page)).toContainText('6 series detected from your transactions')
+    await expect(banner(page)).toContainText('renaming one splits it in two')
+  })
+
+  test('adopt all converts every leftover in one go', async ({ page }) => {
+    const writes = []
+    await openRecurring(page, { writes })
+
+    await banner(page).getByRole('button', { name: 'Adopt all' }).click()
+
+    // One rule per series, and one link call per series.
+    await expect.poll(() => writesTo(writes, 'scheduled_payments', 'POST').length,
+                      { timeout: 15000 }).toBe(6)
+    await expect.poll(() => writesTo(writes, 'transactions', 'PATCH').length).toBe(6)
+
+    const names = writesTo(writes, 'scheduled_payments', 'POST').map(w => w.body[0].name).sort()
+    expect(names).toEqual(['Celular', 'Gym', 'Internet', 'Mortgage', 'Rent', 'Salary'])
+  })
+
+  test('with nothing left to adopt the banner is gone', async ({ page }) => {
+    // Every transaction already linked, so no series can be inferred.
+    await openRecurring(page, { rules: [mkRule({ id: 'rule-1', name: 'Mortgage Rule', amount: 2000 })] })
+    const inferred = await page.locator('.rec-row').filter({ hasText: 'Detected' }).count()
+    if (inferred === 0) await expect(banner(page)).toHaveCount(0)
   })
 })

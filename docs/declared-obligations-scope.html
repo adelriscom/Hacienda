@@ -245,12 +245,15 @@
     <p class="lede">
       Defects 5 and 6 are the last two open from the recurring-payments audit, and neither is a
       coding error — both follow from inferring obligations out of transactions. This scopes the
-      change that dissolves them: giving an obligation a row of its own.
+      change that dissolves them: giving an obligation a row of its own. All five phases are now
+      built and tested — what remains is applying the migrations and running the backfill against
+      the live project, in the order below.
     </p>
     <div class="meta">
       <span><b>Closes</b> Defects 5 and 6</span>
       <span><b>New tables</b> none — <code>scheduled_payments</code> already exists</span>
-      <span><b>Migration</b> 018</span>
+      <span><b>Migrations</b> 018 · 019</span>
+      <span><b>Status</b> all five phases built</span>
       <span><b>Date</b> 15 October 2026</span>
     </div>
   </div>
@@ -376,7 +379,7 @@
 
       <div class="phase">
         <span class="phase-n">1</span>
-        <div class="phase-head"><h3>Schema</h3><span class="chip ok">Small</span></div>
+        <div class="phase-head"><h3>Schema</h3><span class="chip ok">Built</span></div>
         <div class="phase-body">
           One migration, reversible, no data written.
           <ul>
@@ -391,7 +394,7 @@
 
       <div class="phase">
         <span class="phase-n">2</span>
-        <div class="phase-head"><h3>Backfill</h3><span class="chip crit">Riskiest</span></div>
+        <div class="phase-head"><h3>Backfill</h3><span class="chip ok">Built</span></div>
         <div class="phase-body">
           Turn every inferred series into a real row, then link its transactions. This is the only
           step that writes to real financial data.
@@ -407,7 +410,7 @@
 
       <div class="phase">
         <span class="phase-n">3</span>
-        <div class="phase-head"><h3>Derivation</h3><span class="chip warn">Medium</span></div>
+        <div class="phase-head"><h3>Derivation</h3><span class="chip ok">Built</span></div>
         <div class="phase-body">
           A second producer of the obligation shape, so declared rules flow through the pipeline that
           already exists.
@@ -423,7 +426,7 @@
 
       <div class="phase">
         <span class="phase-n">4</span>
-        <div class="phase-head"><h3>Rule management</h3><span class="chip crit">Largest</span></div>
+        <div class="phase-head"><h3>Rule management</h3><span class="chip ok">Built</span></div>
         <div class="phase-body">
           The user-facing half, and the only phase that changes what people do.
           <ul>
@@ -438,13 +441,15 @@
 
       <div class="phase">
         <span class="phase-n">5</span>
-        <div class="phase-head"><h3>Convergence</h3><span class="chip info">Gated on 4</span></div>
+        <div class="phase-head"><h3>Convergence</h3><span class="chip ok">Built</span></div>
         <div class="phase-body">
           Retire the old path once nothing depends on it.
           <ul>
-            <li>Drop description-based grouping and the median fallback.</li>
-            <li>Decide <code>is_recurring</code>'s fate — see the decisions below.</li>
-            <li>Defect 6 closes here: with grouping gone, a rename is just a rename.</li>
+            <li>Nothing writes <code>is_recurring</code> any more; a transaction is recurring because it points at an obligation.</li>
+            <li><b>Adopt all</b> on the Recurring screen converts every leftover series in one go, and the screen says how many are left.</li>
+            <li>Migration 019 drops the column — and <b>refuses</b> while any flagged transaction is still unlinked, because dropping it then would hide those series with no way to find them.</li>
+            <li>The notification bell was only seeing inferred series; it now reads declared obligations too.</li>
+            <li>Defect 6 closes here: a rule has an id, so a rename is just a rename.</li>
           </ul>
           <div class="phase-files">frontend/src/hooks/useRecurring.js · frontend/src/hooks/useTransactions.js</div>
         </div>

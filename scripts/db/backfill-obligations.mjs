@@ -61,6 +61,18 @@ async function main() {
       process.exit(1)
     }
 
+    // This tool exists to adopt series that are only marked by the legacy flag.
+    // Migration 019 removes that flag once everything has been adopted, so
+    // reaching here afterwards means the work is already done.
+    const { rows: legacy } = await client.query(`
+      SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'transactions' AND column_name = 'is_recurring'`)
+    if (!legacy.length) {
+      console.log('Nothing to backfill: is_recurring was retired by migration 019,')
+      console.log('so every series is already a declared obligation.')
+      return
+    }
+
     const { rows } = await client.query(`
       SELECT t.id, t.user_id, t.account_id, t.category_id, t.occurred_at,
              t.description, t.amount, t.person, t.exchange_rate, t.obligation_id

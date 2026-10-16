@@ -14,7 +14,7 @@ function initForm(tx, defaultPerson = 'Alexander') {
   if (!tx) return {
     occurred_at: today(), description: '', amount: '', type: 'expense',
     account_id: '', to_account_id: '', category_id: '', person: defaultPerson,
-    notes: '', is_recurring: false, obligation_id: '', status: 'match', exchange_rate: '',
+    notes: '', obligation_id: '', status: 'match', exchange_rate: '',
   }
   return {
     occurred_at:    new Date(tx.occurred_at).toISOString().slice(0, 10),
@@ -26,7 +26,6 @@ function initForm(tx, defaultPerson = 'Alexander') {
     category_id:    tx.category_id || '',
     person:         tx.person || defaultPerson,
     notes:          tx.notes || '',
-    is_recurring:   tx.is_recurring || false,
     obligation_id:  tx.obligation_id || '',
     status:         tx.status || 'review',
     exchange_rate:  tx.exchange_rate ? String(tx.exchange_rate) : '',
@@ -101,10 +100,9 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
         category_id:   form.category_id || null,
         person:        form.person,
         notes:         form.notes || null,
-        // The link is what makes a transaction part of an obligation. The flag
-        // is kept in step for the code that still reads it.
+        // The link is what makes a transaction part of an obligation. There is
+        // no separate flag to keep in step.
         obligation_id: form.obligation_id || null,
-        is_recurring:  form.obligation_id ? true : form.is_recurring,
         status:        isEdit ? form.status : 'match',
         ...(isForeign && form.exchange_rate ? { exchange_rate: parseFloat(form.exchange_rate) } : {}),
       }
@@ -124,7 +122,6 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
           category_id:       null,
           person:            form.person,
           notes:             form.notes || null,
-          is_recurring:      false,
           status:            'match',
           transfer_group_id,
         }
@@ -325,7 +322,7 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
                 the payment settles that period instead of being guessed at by
                 description. With no obligations declared yet, the old flag is
                 still offered. */}
-            {obligations.length > 0 ? (
+            {obligations.length > 0 && (
               <div className="form-field span-2">
                 <label htmlFor="tx-obligation">{t('newTx.countsToward')}</label>
                 <select id="tx-obligation" name="obligation_id" value={form.obligation_id}
@@ -338,15 +335,6 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
                   ))}
                 </select>
                 <span className="field-hint">{t('newTx.countsHint')}</span>
-              </div>
-            ) : (
-              <div className="form-field" style={{ justifyContent: 'flex-end' }}>
-                <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.is_recurring}
-                    onChange={e => set('is_recurring', e.target.checked)}
-                    style={{ width: 'auto', height: 'auto' }} />
-                  {t('newTx.recurring')}
-                </label>
               </div>
             )}
 

@@ -109,8 +109,11 @@ if [ -f "$BACKFILL" ] && command -v node >/dev/null 2>&1; then
   psql_run -c "create database backfill_test" >/dev/null 2>&1
   bf() { psql_run -q -d backfill_test "$@"; }
   bf -f "$HERE/harness.sql" >/dev/null 2>&1
+  # The backfill is a pre-019 tool: it adopts series marked by is_recurring,
+  # which 019 removes once they all have been. Build the database it is actually
+  # meant to run against.
   for f in "$MIGRATIONS"/*.sql; do
-    case "$(basename "$f")" in *seed*) continue ;; esac
+    case "$(basename "$f")" in *seed*|019_*) continue ;; esac
     bf -f "$f" >/dev/null 2>&1
   done
   bf -f "$HERE/backfill-fixture.sql" >/dev/null 2>&1

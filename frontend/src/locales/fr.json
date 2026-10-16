@@ -179,7 +179,10 @@
       "weekly": "Hebdomadaire", "biweekly": "Aux deux semaines", "semimonthly": "Bimensuel",
       "monthly": "Mensuel", "quarterly": "Trimestriel", "yearly": "Annuel"
     },
-    "adopt": "En faire une obligation", "detected": "Détecté", "adoptHint": "D\u00e9tect\u00e9 dans vos transactions",
+    "adopt": "En faire une obligation", "detected": "Détecté", "pendingTitle": "{{count}} séries détectées dans vos transactions",
+    "pendingBody": "Elles fonctionnent toujours, mais n’ont pas d’identité propre : renommer l’une la coupe en deux. Transformez-les en obligations et cela cesse.",
+    "adoptAll": "Tout adopter", "converged": "Chaque série est une obligation déclarée.",
+    "adoptHint": "D\u00e9tect\u00e9 dans vos transactions",
     "pause": "Mettre en pause", "resume": "Reprendre", "paused": "En pause", "declared": "Obligation",
     "addBtn": "Ajouter une obligation",
     "emptyTitle": "Aucune obligation pour l\u2019instant",

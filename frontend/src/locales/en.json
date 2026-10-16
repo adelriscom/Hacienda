@@ -180,6 +180,9 @@
       "weekly": "Weekly", "biweekly": "Biweekly", "semimonthly": "Semi-monthly",
       "monthly": "Monthly", "quarterly": "Quarterly", "yearly": "Annual"
     },
+    "pendingTitle": "{{count}} series detected from your transactions",
+    "pendingBody": "They still work, but they have no identity of their own — renaming one splits it in two. Turn them into obligations and that stops.",
+    "adoptAll": "Adopt all", "converged": "Every series is a declared obligation.",
     "adopt": "Make it an obligation", "detected": "Detected", "adoptHint": "Detected from your transactions",
     "pause": "Pause", "resume": "Resume", "paused": "Paused", "declared": "Obligation",
     "addBtn": "Add obligation",

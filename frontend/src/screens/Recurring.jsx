@@ -42,7 +42,8 @@ export default function Recurring() {
   // Calendar and the Dashboard already are.
   const {
     items, loading, refresh, removeRecurring,
-    createObligation, updateObligation, deleteObligation, setObligationActive, adoptSeries,
+    createObligation, updateObligation, deleteObligation, setObligationActive,
+    adoptSeries, adoptAll,
   } = useRecurring({ userId: isFamily ? null : myUserId })
   const { updateTransaction, deleteTransaction } = useTransactions()
   const { t } = useTranslation()
@@ -51,6 +52,9 @@ export default function Recurring() {
   const [editingItem, setEditingItem] = useState(null)
   const [busy,        setBusy]        = useState(null)
 
+  // Anything still inferred has no identity of its own — that is defect 6, and
+  // adopting it is what closes it.
+  const pending = items.filter(i => !i._declared)
   const incomeItems  = items.filter(i => i.amount > 0)
   const expenseItems = items.filter(i => i.amount < 0)
 
@@ -82,6 +86,28 @@ export default function Recurring() {
           <Icon name="plus" size={12} /> {t('obligation.addBtn')}
         </button>
       </Topbar>
+
+      {/* What is left to converge, and a way to do it in one go. */}
+      {!loading && pending.length > 0 && (
+        <div className="card" style={{
+          marginBottom: 16, padding: '14px 18px', display: 'flex',
+          alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          borderLeft: '3px solid var(--warn)',
+        }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink-0)' }}>
+              {t('obligation.pendingTitle', { count: pending.length })}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 3, maxWidth: 560 }}>
+              {t('obligation.pendingBody')}
+            </div>
+          </div>
+          <button className="btn primary sm" disabled={busy === '__all__'}
+            onClick={() => run('__all__', () => adoptAll(pending))}>
+            {busy === '__all__' ? t('obligation.saving') : t('obligation.adoptAll')}
+          </button>
+        </div>
+      )}
 
       {/* KPI summary */}
       {!loading && items.length > 0 && (

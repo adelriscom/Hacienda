@@ -32,8 +32,23 @@ export function useRecurring({ userId = null } = {}) {
       .select('*, account:accounts(name, currency), category:categories(name, color)')
     if (userId) ruleQuery = ruleQuery.eq('user_id', userId)
 
-    let [{ data: txs }, { data: rules, error: ruleError }] =
+    let [txResult, { data: rules, error: ruleError }] =
       await Promise.all([txQuery, ruleQuery])
+
+    // `is_recurring` only exists to find series that haven't been adopted yet.
+    // Once migration 019 drops it the or(...) above fails, and linked
+    // transactions are all that matter — so fall back to those.
+    if (txResult.error) {
+      let linkedOnly = supabase
+        .from('transactions')
+        .select('*, account:accounts(name, currency), category:categories(name, color)')
+        .not('obligation_id', 'is', null)
+        .neq('status', 'ghost').neq('status', 'duplicate')
+        .order('occurred_at', { ascending: false })
+      if (userId) linkedOnly = linkedOnly.eq('user_id', userId)
+      txResult = await linkedOnly
+    }
+    let txs = txResult.data
 
     // Before migration 018 the column and table aren't there yet. Fall back to
     // the inferred-only path rather than rendering nothing.
@@ -155,7 +170,7 @@ export function useRecurring({ userId = null } = {}) {
 
   // Turns an inferred series into a real rule and links its transactions —
   // the per-item equivalent of the backfill script, sharing its derivation.
-  async function adoptSeries(item) {
+  async function adoptSeries(item, { refresh = true } = {}) {
     const { data: { session } } = await supabase.auth.getSession()
     const rule = ruleFromObligation(toObligation(item))
     const { data, error } = await supabase
@@ -175,13 +190,27 @@ export function useRecurring({ userId = null } = {}) {
         .from('transactions').update({ obligation_id: data.id }).in('id', ids)
       if (linkError) throw linkError
     }
-    await load()
+    if (refresh) await load()
     return data.id
   }
 
-  // Takes a grouped item and unflags every transaction in the series. Clearing
-  // only the group's representative would leave the rest flagged, and the series
-  // would simply reappear behind an older transaction.
+  // Converges the whole screen in one go. Sequential on purpose: each adopt is
+  // an insert plus a link, and a failure halfway should leave the series it
+  // already converted intact rather than racing a dozen half-finished writes.
+  async function adoptAll(seriesItems) {
+    let adopted = 0
+    for (const item of seriesItems) {
+      if (item._declared) continue
+      await adoptSeries(item, { refresh: false })
+      adopted++
+    }
+    await load()
+    return adopted
+  }
+
+  // Unflags every transaction in an inferred series. Only reachable for series
+  // that were never adopted — a declared obligation is deleted, not unflagged —
+  // and goes away with the column in migration 019.
   async function removeRecurring(item) {
     const ids = item?._txns?.length ? item._txns.map(t => t.id) : [item?.id ?? item]
     const { error } = await supabase
@@ -194,6 +223,6 @@ export function useRecurring({ userId = null } = {}) {
     items, occurrences, loading, refresh: load,
     removeRecurring,
     createObligation, updateObligation, deleteObligation, setObligationActive,
-    adoptSeries,
+    adoptSeries, adoptAll,
   }
 }
