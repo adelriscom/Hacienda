@@ -312,6 +312,8 @@
       "investment": "Investissement",
       "cash": "Espèces"
     },
+    "derivedFrom": "de {{count}} transactions", "derivedHint": "Ancré à {{opening}}, plus {{count}} transactions",
+    "sinceAnchor": "depuis l’ancrage",
     "modal": {
       "titleNew": "Nouveau compte",
       "titleEdit": "Modifier le compte",
@@ -319,7 +321,7 @@
       "namePlaceholder": "ex. RBC Chequing",
       "type": "Type de compte",
       "currency": "Devise",
-      "balance": "Solde actuel",
+      "balanceHint": "— indique ce qu’il contient; l’ancrage s’ajuste", "balance": "Solde actuel",
       "creditLimit": "Limite de crédit",
       "interestRate": "Taux d'intérêt annuel (% APR)",
       "interestRatePlaceholder": "ex. 19.99",

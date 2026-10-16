@@ -52,7 +52,7 @@ export const recurringRows = () => OBLIGATIONS.flatMap((o, oi) =>
   o.pays.map(([date, amount, rate], pi) => ({
     id: `tx-${oi}-${pi}`,
     user_id: o.owner,
-    account_id: `acct-${oi}`,
+    account_id: o.account === COP ? 'acct-cop' : 'acct-cad',
     category_id: null,
     occurred_at: `${date}T12:00:00+00:00`,
     description: o.desc,
@@ -82,10 +82,15 @@ export const MEMBERS = [
 // The accounts the fixture transactions already reference, so account pickers
 // have something to offer.
 export const ACCOUNTS = [
+  // `balance` is the last anchored figure; `opening_balance` is the anchor, so a
+  // derived balance can be checked against both.
   { id: 'acct-cad', user_id: ALEX,    name: 'Scotia Chequing', type: 'checking',
-    currency: 'CAD', balance: 0, is_active: true },
+    currency: 'CAD', balance: 4750, opening_balance: 3200, is_active: true },
   { id: 'acct-cop', user_id: MARCELA, name: 'Bancolombia',     type: 'checking',
-    currency: 'COP', balance: 0, is_active: true },
+    currency: 'COP', balance: 0, opening_balance: 1200000, is_active: true },
+  { id: 'acct-card', user_id: ALEX,   name: 'Scotia Visa',     type: 'credit',
+    currency: 'CAD', balance: -1200, opening_balance: -900, credit_limit: 5000,
+    interest_rate: 19.99, is_active: true },
 ]
 
 const RATES = [
@@ -137,7 +142,8 @@ export async function stubSupabase(page, viewMode, writes = []) {
     const query  = url.search
     const single = (req.headers()['accept'] || '').includes('pgrst.object')
 
-    if (req.method() !== 'GET') {
+    // HEAD is how supabase-js asks for a count — a read, not a write.
+    if (req.method() !== 'GET' && req.method() !== 'HEAD') {
       writes.push({ method: req.method(), table, query, body: req.postDataJSON?.() ?? null })
       // An insert that asks for the row back (.select().single()) needs an
       // object, not an empty list, or the client rejects the response.
@@ -167,9 +173,11 @@ export async function stubSupabase(page, viewMode, writes = []) {
       const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
       if (owner) body = body.filter(r => r.user_id === owner[1])
     } else if (table === 'transactions') {
-      // Matches both `is_recurring=eq.true` and the or(...) form the hook uses
-      // once declared obligations are in play.
-      body = query.includes('is_recurring') ? recurringRows() : []
+      // Matches `is_recurring=eq.true`, the or(...) form the hook uses once
+      // declared obligations are in play, and the balance-movement query that
+      // selects account_id/amount/status.
+      body = (query.includes('is_recurring') || query.includes('account_id'))
+        ? recurringRows() : []
       // The personal profile filters server-side; mirror that here.
       const owner = query.match(/user_id=eq\.([0-9a-f-]+)/)
       if (owner) body = body.filter(r => r.user_id === owner[1])
