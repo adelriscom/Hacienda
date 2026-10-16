@@ -78,7 +78,15 @@ jobs:
           mv "/tmp/backups/$OUT" "backups/$OUT"
 
           # Prune: keep only the newest $RETENTION dumps.
-          ls -1t backups/*.sql.gz.gpg 2>/dev/null | tail -n +$((RETENTION + 1)) | xargs -r git rm --quiet
+          #
+          # Sorted by filename, not mtime. `git checkout db-backups` rewrites every
+          # file on the branch, so they all carry a checkout-time mtime that is
+          # newer than the dump gpg wrote seconds earlier — which made `ls -1t`
+          # rank the new backup last and select it for deletion once the branch
+          # held RETENTION files. `git rm` then failed on it, untracked, and took
+          # the whole job with it. The names are UTC timestamps, so they sort
+          # chronologically on their own.
+          ls -1 backups/*.sql.gz.gpg 2>/dev/null | sort -r | tail -n +$((RETENTION + 1)) | xargs -r git rm --quiet --ignore-unmatch
 
           git add backups/ README.md
           git commit -m "Backup $OUT" || { echo "Nothing to commit"; exit 0; }
