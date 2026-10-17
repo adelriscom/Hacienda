@@ -21,6 +21,7 @@ on:
         options:
           - coverage              # read-only · per-account transaction coverage
           - balances              # read-only · derived vs stored balance, and drift
+          - suggest-obligations   # read-only · what actually repeats, from all history
           - backfill-dry-run      # read-only · what the backfill would create
           - migrate-018           # writes · declared obligations schema
           - backfill-apply        # writes · create obligations, link transactions
@@ -52,7 +53,7 @@ jobs:
           case "$TASK" in
             coverage|backfill-dry-run)
               echo "::notice::$TASK is read-only." ;;
-            balances)
+            balances|suggest-obligations)
               echo "::notice::$TASK is read-only." ;;
             *)
               if [ "$CONFIRM" != "yes" ]; then
@@ -78,7 +79,7 @@ jobs:
           echo "::notice::Newest backup is $newest"
 
       - name: Install PostgreSQL 17 client
-        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' || inputs.task == 'balances' }}
+        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' || inputs.task == 'balances' || inputs.task == 'suggest-obligations' }}
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             > /etc/apt/sources.list.d/pgdg.list'
@@ -168,6 +169,66 @@ jobs:
                 from accounts a
             ) x
            where abs(d) > 0.005;
+          SQL
+
+      - name: Suggest obligations
+        if: ${{ inputs.task == 'suggest-obligations' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          \echo 'What actually repeats, across every transaction — not just the ones'
+          \echo 'flagged is_recurring. Bank descriptions vary ("NETFLIX.COM" vs'
+          \echo '"NETFLIX.COM, VANCOUVER, BC"), so they are matched on letters only.'
+          \echo ''
+          with norm as (
+            select btrim(substring(regexp_replace(lower(t.description), '[^a-z ]', '', 'g')
+                                   from 1 for 18)) as key,
+                   t.description, t.amount, t.occurred_at, a.currency
+              from transactions t
+              left join accounts a on a.id = t.account_id
+             where t.status not in ('ghost','duplicate')
+               and t.type <> 'transfer'
+               and length(btrim(regexp_replace(lower(t.description), '[^a-z ]', '', 'g'))) > 2
+          ),
+          seq as (
+            select key, occurred_at,
+                   lag(occurred_at) over (partition by key order by occurred_at) as prev
+              from norm
+          ),
+          gaps as (
+            select key, extract(epoch from (occurred_at - prev)) / 86400 as gap
+              from seq where prev is not null
+          ),
+          cadence as (
+            select key, round(percentile_cont(0.5) within group (order by gap)::numeric) as days
+              from gaps group by key
+          )
+          select n.key,
+                 count(*)                                                   as times,
+                 max(n.currency)                                            as cur,
+                 round(percentile_cont(0.5) within group (order by abs(n.amount))::numeric, 2) as typical,
+                 c.days                                                     as gap_days,
+                 case
+                   when c.days between  5 and  10 then 'weekly'
+                   when c.days between 11 and  17 then 'biweekly'
+                   when c.days between 18 and  24 then 'semimonthly'
+                   when c.days between 25 and  45 then 'monthly'
+                   when c.days between 70 and 110 then 'quarterly'
+                   when c.days between 300 and 400 then 'yearly'
+                   else '—'
+                 end                                                        as cadence,
+                 min(n.occurred_at)::date                                   as first_seen,
+                 max(n.occurred_at)::date                                   as last_seen,
+                 (current_date - max(n.occurred_at)::date)                  as days_ago,
+                 case when max(n.amount) < 0 then 'expense' else 'income' end as kind
+            from norm n
+            join cadence c on c.key = n.key
+           group by n.key, c.days
+          having count(*) >= 3
+             and c.days between 5 and 400
+           order by kind, c.days, times desc;
           SQL
 
       - name: Apply a migration
