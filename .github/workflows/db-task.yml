@@ -30,7 +30,7 @@ on:
           - migrate-020           # writes · anchored account balances
           - migrate-019           # writes · retire is_recurring (do this last)
       pattern:
-        description: "For inspect — text to match in a description (case-insensitive)"
+        description: "inspect: text to match in a description. suggest-obligations: an account name to scope to."
         type: string
         required: false
         default: ""
@@ -182,9 +182,11 @@ jobs:
         if: ${{ inputs.task == 'suggest-obligations' }}
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PATTERN: ${{ inputs.pattern }}
         run: |
           set -euo pipefail
-          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          # An empty pattern means every account.
+          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v acct="${PATTERN:-}" <<'SQL'
           \echo 'What actually repeats, across every transaction — not just the ones'
           \echo 'flagged is_recurring. Bank descriptions vary ("NETFLIX.COM" vs'
           \echo '"NETFLIX.COM, VANCOUVER, BC"), so they are matched on letters only.'
@@ -198,6 +200,7 @@ jobs:
              where t.status not in ('ghost','duplicate')
                and t.type <> 'transfer'
                and length(btrim(regexp_replace(lower(t.description), '[^a-z ]', '', 'g'))) > 2
+               and (:'acct' = '' or a.name ilike '%' || :'acct' || '%')
           ),
           seq as (
             select key, occurred_at,
