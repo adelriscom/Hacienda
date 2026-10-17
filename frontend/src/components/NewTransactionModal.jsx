@@ -100,9 +100,11 @@ export default function NewTransactionModal({ onClose, onSave, onSavePair, onUpd
         category_id:   form.category_id || null,
         person:        form.person,
         notes:         form.notes || null,
-        // The link is what makes a transaction part of an obligation. There is
-        // no separate flag to keep in step.
-        obligation_id: form.obligation_id || null,
+        // Only sent when there is an obligation to link to. Before migration 018
+        // the column does not exist, and PostgREST rejects the entire write for
+        // an unknown column — even one set to null — which broke saving any
+        // transaction at all.
+        ...(obligations.length > 0 ? { obligation_id: form.obligation_id || null } : {}),
         status:        isEdit ? form.status : 'match',
         ...(isForeign && form.exchange_rate ? { exchange_rate: parseFloat(form.exchange_rate) } : {}),
       }
