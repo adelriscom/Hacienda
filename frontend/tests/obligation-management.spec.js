@@ -305,3 +305,39 @@ test.describe('Obligations · converging', () => {
     if (inferred === 0) await expect(banner(page)).toHaveCount(0)
   })
 })
+
+test.describe('Obligations · before migration 018', () => {
+  test('saving a transaction sends no obligation_id when none exist', async ({ page }) => {
+    // PostgREST rejects a write naming a column it does not know — even one set
+    // to null. Sending obligation_id unconditionally broke saving any
+    // transaction at all until 018 had been applied.
+    const writes = []
+    await openApp(page, '/expenses', 'family', writes, [])
+    await page.getByRole('button', { name: /New transaction/i }).first().click()
+
+    await page.locator('#tx-desc').fill('Coffee')
+    await page.locator('#tx-amount').fill('6')
+    await page.getByRole('button', { name: /Save transaction/i }).click()
+
+    await expect.poll(() => writesTo(writes, 'transactions', 'POST').length).toBe(1)
+    const [body] = writesTo(writes, 'transactions', 'POST')[0].body
+    expect(body).not.toHaveProperty('obligation_id')
+    expect(body.description).toBe('Coffee')
+  })
+
+  test('the link is sent once an obligation exists to link to', async ({ page }) => {
+    const writes = []
+    await openApp(page, '/expenses', 'family', writes, [
+      mkRule({ id: 'rule-1', name: 'Mortgage Rule', amount: 2000 }),
+    ])
+    await page.getByRole('button', { name: /New transaction/i }).first().click()
+
+    await page.locator('#tx-desc').fill('Mortgage')
+    await page.locator('#tx-amount').fill('2000')
+    await page.getByRole('button', { name: /Save transaction/i }).click()
+
+    await expect.poll(() => writesTo(writes, 'transactions', 'POST').length).toBe(1)
+    const [body] = writesTo(writes, 'transactions', 'POST')[0].body
+    expect(body).toHaveProperty('obligation_id')
+  })
+})
