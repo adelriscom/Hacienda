@@ -22,6 +22,7 @@ on:
           - coverage              # read-only · per-account transaction coverage
           - balances              # read-only · derived vs stored balance, and drift
           - suggest-obligations   # read-only · what actually repeats, from all history
+          - recent-dates          # read-only · the actual dates behind each candidate
           - backfill-dry-run      # read-only · what the backfill would create
           - migrate-018           # writes · declared obligations schema
           - backfill-apply        # writes · create obligations, link transactions
@@ -53,7 +54,7 @@ jobs:
           case "$TASK" in
             coverage|backfill-dry-run)
               echo "::notice::$TASK is read-only." ;;
-            balances|suggest-obligations)
+            balances|suggest-obligations|recent-dates)
               echo "::notice::$TASK is read-only." ;;
             *)
               if [ "$CONFIRM" != "yes" ]; then
@@ -79,7 +80,7 @@ jobs:
           echo "::notice::Newest backup is $newest"
 
       - name: Install PostgreSQL 17 client
-        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' || inputs.task == 'balances' || inputs.task == 'suggest-obligations' }}
+        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' || inputs.task == 'balances' || inputs.task == 'suggest-obligations' || inputs.task == 'recent-dates' }}
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             > /etc/apt/sources.list.d/pgdg.list'
@@ -229,6 +230,47 @@ jobs:
           having count(*) >= 3
              and c.days between 5 and 400
            order by kind, c.days, times desc;
+          SQL
+
+      - name: Recent dates per candidate
+        if: ${{ inputs.task == 'recent-dates' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          \echo 'The actual dates behind each repeating candidate still active in the'
+          \echo 'last 60 days — so a declared obligation can be anchored on the day it'
+          \echo 'is really due rather than the day it last happened.'
+          \echo ''
+          with norm as (
+            select btrim(substring(regexp_replace(lower(t.description), '[^a-z ]', '', 'g')
+                                   from 1 for 18)) as key,
+                   t.amount, t.occurred_at, a.currency
+              from transactions t
+              left join accounts a on a.id = t.account_id
+             where t.status not in ('ghost','duplicate') and t.type <> 'transfer'
+          ),
+          live as (
+            select key from norm
+             group by key
+            having count(*) >= 3
+               and (current_date - max(occurred_at)::date) <= 60
+          )
+          select n.key,
+                 max(n.currency) as cur,
+                 count(*)        as times,
+                 string_agg(to_char(n.occurred_at, 'Mon DD') || ' $' ||
+                            to_char(abs(n.amount), 'FM999G999D00'),
+                            '  ·  ' order by n.occurred_at desc) as recent
+            from (
+              select key, amount, occurred_at, currency,
+                     row_number() over (partition by key order by occurred_at desc) as rn
+                from norm
+            ) n
+           where n.key in (select key from live) and n.rn <= 6
+           group by n.key
+           order by n.key;
           SQL
 
       - name: Apply a migration
