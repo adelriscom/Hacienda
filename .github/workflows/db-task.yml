@@ -20,6 +20,7 @@ on:
         default: coverage
         options:
           - coverage              # read-only · per-account transaction coverage
+          - balances              # read-only · derived vs stored balance, and drift
           - backfill-dry-run      # read-only · what the backfill would create
           - migrate-018           # writes · declared obligations schema
           - backfill-apply        # writes · create obligations, link transactions
@@ -51,6 +52,8 @@ jobs:
           case "$TASK" in
             coverage|backfill-dry-run)
               echo "::notice::$TASK is read-only." ;;
+            balances)
+              echo "::notice::$TASK is read-only." ;;
             *)
               if [ "$CONFIRM" != "yes" ]; then
                 echo "::error::$TASK writes to the database. Re-run with confirm: yes"
@@ -75,7 +78,7 @@ jobs:
           echo "::notice::Newest backup is $newest"
 
       - name: Install PostgreSQL 17 client
-        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' }}
+        if: ${{ startsWith(inputs.task, 'migrate') || inputs.task == 'coverage' || inputs.task == 'balances' }}
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             > /etc/apt/sources.list.d/pgdg.list'
@@ -129,6 +132,42 @@ jobs:
             select 1 from information_schema.columns
              where table_name = 'transactions' and column_name = 'obligation_id'
           ) as migration_018_applied;
+          SQL
+
+      - name: Balance check
+        if: ${{ inputs.task == 'balances' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          /usr/lib/postgresql/17/bin/psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          \echo '── Derived vs stored balance ──'
+          \echo 'Migration 020 back-computes the anchor, so drift must be 0.00 on every'
+          \echo 'account the moment it lands. Anything else means a rounding or scope bug.'
+          with derived as (
+            select a.id, a.name, a.currency, a.balance as stored, a.opening_balance,
+                   a.opening_balance + coalesce((
+                     select sum(t.amount) from transactions t
+                      where t.account_id = a.id
+                        and t.status not in ('ghost','duplicate')), 0) as computed
+              from accounts a
+          )
+          select name, currency, stored, opening_balance, computed,
+                 round(computed - stored, 2) as drift
+            from derived
+           order by abs(computed - stored) desc, name;
+
+          \echo '── Any account where the two disagree ──'
+          select count(*) as accounts_with_drift
+            from (
+              select a.id,
+                     a.opening_balance + coalesce((
+                       select sum(t.amount) from transactions t
+                        where t.account_id = a.id
+                          and t.status not in ('ghost','duplicate')), 0) - a.balance as d
+                from accounts a
+            ) x
+           where abs(d) > 0.005;
           SQL
 
       - name: Apply a migration
